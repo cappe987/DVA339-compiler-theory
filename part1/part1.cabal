@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e732383d24781a051d40b93bacafd7506fa59bff4b22459c87f5fdf559866358
+-- hash: 24c0d038b43ebfbb0a4e3717aed427a51bf60a210d17d36dcc2dfb90112afaf4
 
 name:           part1
 version:        0.1.0.0
@@ -27,9 +27,9 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
-  other-modules:
-      Paths_part1
+      MyLexer
+  -- other-modules:
+  --     Paths_part1
   hs-source-dirs:
       src
   build-depends:
@@ -38,8 +38,8 @@ library
 
 executable part1-exe
   main-is: Main.hs
-  other-modules:
-      Paths_part1
+  -- other-modules:
+  --     Paths_part1
   hs-source-dirs:
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
@@ -51,8 +51,8 @@ executable part1-exe
 test-suite part1-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
-  other-modules:
-      Paths_part1
+  -- other-modules:
+  --     Paths_part1
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
