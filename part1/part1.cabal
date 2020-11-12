@@ -28,8 +28,9 @@ source-repository head
 library
   exposed-modules:
       MyLexer
-  -- other-modules:
-  --     Paths_part1
+      MyParser
+  other-modules:
+      -- Paths_part1
   hs-source-dirs:
       src
   build-depends:
@@ -38,11 +39,11 @@ library
 
 executable part1-exe
   main-is: Main.hs
-  -- other-modules:
+  other-modules:
   --     Paths_part1
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , part1

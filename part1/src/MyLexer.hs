@@ -1,5 +1,7 @@
 module MyLexer
     ( testLexer
+    , runLexer
+    , Token
     ) where
 
 import Data.List
@@ -113,8 +115,11 @@ toString :: Token -> String
 toString Token {typeof=t, pos=pos, lexeme=lexeme} = 
   typeToString t ++ " " ++ lexeme ++ " " ++ show (line pos) ++ " " ++ show (col pos) ++ " "
 
+runLexer :: String -> [Token]
+runLexer s = lexer s (Position {col=1, line=1}) 
+
 runTest :: String -> String
-runTest input = foldMap toString $ lexer input (Position {col=1, line=1})
+runTest input = foldMap toString $ runLexer input
 
 testLexer :: IO ()
 testLexer = 
@@ -147,12 +152,3 @@ Order of definition
 
 -}
 
-
--- data AST = 
---     Leaf Token
---   | Stmnt AST AST -- For statements separated by semicolon
---   | Node AST Token AST
-
-
--- parse :: [Token] -> AST
--- parse = undefined

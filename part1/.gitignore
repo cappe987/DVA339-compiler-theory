@@ -3,5 +3,15 @@
 __MACOSX/
 Test11.zip
 Test11.exe
+Test11.pdb
+Test12.exe
+Test12.zip
+Parser.exe
+package.yaml_
 Lexer.exe
+Lexer.pdb
+Lexer.exe.mdb
 Generator.dll
+Generator.pdb
+Generator.dll.mdb
+can18010_part11.zip
