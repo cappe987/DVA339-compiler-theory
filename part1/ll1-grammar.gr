@@ -1,0 +1,46 @@
+%start S
+
+%token ID
+%token PRINT
+%token NUM
+
+%token COMMA
+%token LPAR
+%token RPAR
+%token ASN
+%token PLUS
+%token SEMI
+
+%%
+
+S : SB SA
+  ;
+
+SA : SEMI SA
+   | 
+   ;
+
+SB : ID ASN E
+   | PRINT LPAR L RPAR
+   ;
+
+E : T EA
+  | LPAR S COMMA E RPAR
+  ;
+
+EA : PLUS T EA
+   | 
+   ; 
+
+T : ID
+  | NUM
+  ;
+
+
+L : E LA
+  ;
+
+LA : COMMA E LA
+   | 
+   ;
+

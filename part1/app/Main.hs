@@ -4,5 +4,5 @@ import MyLexer
 import MyParser
 
 main :: IO ()
-main = testLexer
--- main = testParser
+-- main = testLexer
+main = testParser
