@@ -3,26 +3,8 @@ module MyParser (
 ) where
 
 import MyLexer
-import Data.Either
 import Data.Bifunctor as Bf
 import Data.List
-
--- data E = 
---     Val T 
---   | 
-
-data T = String | Int -- ID or NUM
-
--- data L = 
-
--- data AST = 
---     Leaf T
---   | Stmnt AST AST -- For statements separated by semicolon
---   | Asn String AST
---   | Add AST AST
---   | Print [AST]
---   | Let AST AST
-
 
 data Stmnt = 
     Asn String Expr
@@ -35,7 +17,6 @@ data Expr =
   | Add Expr Expr
   | Let [Stmnt] Expr
   -- deriving Show
-
 
 type AST = [Stmnt]
 
@@ -52,7 +33,7 @@ instance Show Stmnt where
 
 posToString Position {line=line, col=col} = show line ++ ":" ++ show col
 
-
+-- The eat functions consume a token of some type. If type didn't match, return error.
 eatToken expType expLexeme (Token {typeof=typeof, pos=pos, lexeme=lexeme}:tokens) = 
   if expType == typeof && expLexeme == lexeme then
     Right tokens
@@ -67,6 +48,7 @@ eatAsn = eatToken OP ":="
 eatComma = eatToken SEP ","
 
 
+-- T: Matches NUM or ID
 t :: [Token] -> Either String (Expr, [Token])
 t (Token {typeof=ID , lexeme=lexeme}:tokens) = Right (Id lexeme, tokens)
 t (Token {typeof=NUM, lexeme=lexeme}:tokens) = Right (Num (read lexeme :: Int), tokens)
@@ -74,11 +56,13 @@ t (Token {pos=pos, lexeme=x}:_) =
   Left ("Expected number or variable, got \'" ++ x ++ "\' at position " ++ posToString pos)
 
 
-
+-- Used to make it just a Num if there was nothing after, else make it an Add
+numOrAdd :: Expr -> Maybe Expr -> Expr
 numOrAdd ex1 (Just ex2) = Add ex1 ex2
 numOrAdd ex1 Nothing = ex1
 
 e :: [Token] -> Either String (Expr, [Token])
+-- E: Let expressions
 e (Token {typeof=SEP, lexeme="("}:tokens) = do 
   (stmnts, tokens) <- s tokens
   tokens <- eatComma tokens 
@@ -88,39 +72,44 @@ e (Token {typeof=SEP, lexeme="("}:tokens) = do
   let letExpr = Let stmnts expr
 
   Bf.first (numOrAdd letExpr) <$> ea tokens
-
+-- E: A number followed by (+ numbers)
 e tokens = 
   t tokens >>= \(expr, tokens) -> Bf.first (numOrAdd expr) <$> ea tokens
 
+-- EA: Handles the (+ number) part of E
 ea :: [Token] -> Either String (Maybe Expr, [Token])
 ea (Token {typeof=OP, pos=pos, lexeme="+"}:tokens) = Bf.first Just <$> e tokens
-
+-- EA: null
 ea tokens = Right (Nothing, tokens)
 
 
-
+-- L: Starts a list
 l :: [Token] -> Either String ([Expr], [Token])
 l tokens = 
   e tokens >>= \(expr, tokens) -> Bf.first (expr :) <$> la tokens
 
 
 la :: [Token] -> Either String ([Expr], [Token])
+-- LA: Comma in a list, followed by another expression
 la (Token {typeof=SEP, lexeme=","}:tokens) = 
   e tokens >>= \(expr, tokens) -> Bf.first (expr :) <$> la tokens
+-- LA: null
 la tokens = Right ([], tokens)
 
 
-
+-- S: Starting point. Starts with a statement, and maybe followed by more.
 s :: [Token] -> Either String ([Stmnt], [Token])
 s tokens = sb tokens >>= \(stmnt, tokens) -> Bf.first (stmnt :) <$> sa tokens
 
 sa :: [Token] -> Either String ([Stmnt], [Token])
+-- SA: Matches a semicolon and starts another statement
 sa (Token {typeof=SEP, lexeme=";"}:tokens) = 
   s tokens
+-- SA: null
 sa tokens = Right ([], tokens)
 
 
-
+-- SB: Matches the actual statements
 sb :: [Token] -> Either String (Stmnt, [Token])
 sb (Token {typeof=KEYW, lexeme="print"}:tokens) = do 
   tokens <- eatLpar tokens
@@ -128,19 +117,18 @@ sb (Token {typeof=KEYW, lexeme="print"}:tokens) = do
   tokens <- eatRpar tokens
   Right (Print stmnts, tokens)
 
--- sb = undefined
-sb (Token {typeof=ID, pos=pos, lexeme=id}:tokens) = do 
+sb (Token {typeof=ID, lexeme=id}:tokens) = do 
   tokens <- eatAsn tokens
   (expr, tokens) <- e tokens
 
   Right (Asn id expr, tokens)
 
-sb (Token {pos=pos, lexeme=lexeme}:tokens) = 
+-- SB: error, no statement to match
+sb (Token {pos=pos, lexeme=lexeme}:_) = 
   Left $ "Expected statement at position " ++ posToString pos 
     ++ ". Got \'" ++ lexeme ++ "\'."
 
 
--- runParser :: [Token] -> AST
 runParser :: [Token] -> AST
 runParser tokens = 
   case s tokens of
@@ -148,6 +136,6 @@ runParser tokens =
     Left err -> error err
 
 
-runTests = (intercalate "; " . map show) . runParser . runLexer
+runTest = (intercalate "; " . map show) . runParser . runLexer
 
-testParser = interact runTests
+testParser = interact runTest
