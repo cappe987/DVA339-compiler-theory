@@ -16,7 +16,7 @@
 S : SB SA
   ;
 
-SA : SEMI SA
+SA : SEMI S
    | 
    ;
 
@@ -28,7 +28,7 @@ E : T EA
   | LPAR S COMMA E RPAR
   ;
 
-EA : PLUS T EA
+EA : PLUS E
    | 
    ; 
 

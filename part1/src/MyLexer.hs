@@ -1,7 +1,9 @@
 module MyLexer
     ( testLexer
     , runLexer
-    , Token
+    , Token (..)
+    , Type (..)
+    , Position (..)
     ) where
 
 import Data.List
@@ -20,7 +22,7 @@ data Type =
   | ID 
   | OP 
   | EOF
-  deriving Show
+  deriving (Show, Eq)
 
 data Token = Token {
     typeof :: Type
