@@ -5,6 +5,7 @@ module MyParser (
 import MyLexer
 import Data.Either
 import Data.Bifunctor as Bf
+import Data.List
 
 -- data E = 
 --     Val T 
@@ -26,17 +27,28 @@ data T = String | Int -- ID or NUM
 data Stmnt = 
     Asn String Expr
   | Print [Expr]
-  deriving Show
+  -- deriving Show
 
 data Expr = 
     Id  String
   | Num Int
   | Add Expr Expr
   | Let [Stmnt] Expr
-  deriving Show
+  -- deriving Show
 
 
 type AST = [Stmnt]
+
+instance Show Expr where
+  show (Id s ) = s
+  show (Num i) = show i
+  show (Add a b) = show a ++ " + " ++ show b
+  show (Let stmnts e) = "(" ++ intercalate "; " (map show stmnts) ++ "," ++ show e ++ ")"
+
+instance Show Stmnt where
+  show (Asn id expr) = id ++ " := " ++ show expr
+  show (Print exprs) = "print (" ++ intercalate "," (map show exprs) ++ ")" 
+
 
 posToString Position {line=line, col=col} = show line ++ ":" ++ show col
 
@@ -82,11 +94,6 @@ e tokens =
 
 ea :: [Token] -> Either String (Maybe Expr, [Token])
 ea (Token {typeof=OP, pos=pos, lexeme="+"}:tokens) = Bf.first Just <$> e tokens
-  -- case t tokens of 
-  --   Left err -> Left err
-  --   Right (expr, tokens) -> 
-  -- t tokens >>= \(expr, tokens) -> Bf.first (Just . numOrAdd expr) <$> ea tokens
-  -- t tokens >>= \(expr, tokens) -> Bf.first (Just . numOrAdd expr) <$> ea tokens
 
 ea tokens = Right (Nothing, tokens)
 
@@ -106,10 +113,6 @@ la tokens = Right ([], tokens)
 
 s :: [Token] -> Either String ([Stmnt], [Token])
 s tokens = sb tokens >>= \(stmnt, tokens) -> Bf.first (stmnt :) <$> sa tokens
-  -- case sb tokens of
-    -- Right (stmnt, tokens) -> (\(sts, ts) -> (stmnt:sts, ts))  <$> sa tokens
-    -- Right (stmnt, tokens) -> Bf.first (stmnt :)  <$> sa tokens
-    -- Left err -> Left err
 
 sa :: [Token] -> Either String ([Stmnt], [Token])
 sa (Token {typeof=SEP, lexeme=";"}:tokens) = 
@@ -138,17 +141,13 @@ sb (Token {pos=pos, lexeme=lexeme}:tokens) =
 
 
 -- runParser :: [Token] -> AST
-runParser :: [Token] -> String
+runParser :: [Token] -> AST
 runParser tokens = 
   case s tokens of
-    Right (ast, _) -> show ast
-    Left err -> err
+    Right (ast, _) -> ast
+    Left err -> error err
 
--- toString :: AST -> String
-toString = id
 
-runTests = toString . runParser . runLexer
--- runTests s = "Hello"
+runTests = (intercalate "; " . map show) . runParser . runLexer
 
--- testParser = interact id
 testParser = interact runTests
