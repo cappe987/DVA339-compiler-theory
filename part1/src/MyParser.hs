@@ -42,9 +42,9 @@ eatToken expType expLexeme (Token {typeof=typeof, pos=pos, lexeme=lexeme}:tokens
       "Expected \'" ++ expLexeme ++ "\' at position " ++ posToString pos 
       ++ ". Got \'" ++ lexeme ++ "\'."
 
-eatLpar = eatToken SEP "("
-eatRpar = eatToken SEP ")"
-eatAsn = eatToken OP ":="
+eatLpar  = eatToken SEP "("
+eatRpar  = eatToken SEP ")"
+eatAsn   = eatToken OP ":="
 eatComma = eatToken SEP ","
 
 
@@ -65,9 +65,9 @@ e :: [Token] -> Either String (Expr, [Token])
 -- E: Let expressions
 e (Token {typeof=SEP, lexeme="("}:tokens) = do 
   (stmnts, tokens) <- s tokens
-  tokens <- eatComma tokens 
-  (expr, tokens) <- e tokens
-  tokens <- eatRpar tokens
+  tokens           <- eatComma tokens 
+  (expr, tokens)   <- e tokens
+  tokens           <- eatRpar tokens
 
   let letExpr = Let stmnts expr
 
@@ -78,7 +78,7 @@ e tokens =
 
 -- EA: Handles the (+ number) part of E
 ea :: [Token] -> Either String (Maybe Expr, [Token])
-ea (Token {typeof=OP, pos=pos, lexeme="+"}:tokens) = Bf.first Just <$> e tokens
+ea (Token {typeof=OP, lexeme="+"}:tokens) = Bf.first Just <$> e tokens
 -- EA: null
 ea tokens = Right (Nothing, tokens)
 

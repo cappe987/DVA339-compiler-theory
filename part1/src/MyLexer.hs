@@ -72,15 +72,13 @@ match (x:xs) toMatch =
 
 matchSeparators :: Position -> String -> Maybe (Token, String)
 matchSeparators pos toMatch = 
-  case match separators toMatch of 
-    (Just (lexeme, rem)) -> Just (Token {typeof=SEP, pos=pos, lexeme=lexeme}, rem)
-    Nothing -> Nothing
+  match separators toMatch >>=
+    \(lexeme, rem) -> Just (Token {typeof=SEP, pos=pos, lexeme=lexeme}, rem)
 
 matchOperators :: Position -> String -> Maybe (Token, String)
 matchOperators pos toMatch = 
-  case match operators toMatch of 
-    (Just (lexeme, rem)) -> Just (Token {typeof=OP, pos=pos, lexeme=lexeme}, rem)
-    Nothing -> Nothing
+    match operators toMatch >>= 
+      \(lexeme, rem) -> Just (Token {typeof=OP, pos=pos, lexeme=lexeme}, rem)
 
 
 incrCol pos n = pos {col=col pos + n}
@@ -93,7 +91,7 @@ lexer ('\r':'\n':xs) pos = lexer xs (pos {col=1, line=line pos + 1})
 lexer ('\r':xs) pos      = lexer xs (pos {col=1, line=line pos + 1})
 lexer input pos =
   case find isJust cases of
-    Nothing -> error ("Lexer error" ++ show input) -- handle better later
+    Nothing -> error ("Lexer error " ++ show input) -- handle better later
     (Just (Just (token, remaining))) -> 
       token : lexer remaining (incrCol pos (length $ lexeme token))
 
