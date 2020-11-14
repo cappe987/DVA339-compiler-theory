@@ -1,10 +1,7 @@
-# part1
+# Lab 1
+A lexer and parser for the language below.
 
-
-
-
-
-# Original from Lab 1.1 (not LL(1))
+# Language (not in LL(1) form)
 S -> S; S 
 S -> id := E 
 S -> print ( L )
