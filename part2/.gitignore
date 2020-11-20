@@ -1,0 +1,6 @@
+.stack-work/
+*~
+Parser.exe
+Test21.exe 
+QUT.ShiftReduceParser.dll
+src/Testparser.y
