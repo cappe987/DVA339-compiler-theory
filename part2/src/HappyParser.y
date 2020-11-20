@@ -9,39 +9,39 @@ import Tokens
 %error { parseError }
 
 %token 
-  if            { TIf $$ }
-  else          { TElse $$ }
-  while         { TWhile $$ }
-  return        { TReturn $$ }
-  intType       { TIntType $$ }
-  boolType      { TBoolType $$ }
-  voidType      { TVoidType $$ }
+  if            { Token TIf _ }
+  else          { Token TElse _ }
+  while         { Token TWhile _ }
+  return        { Token TReturn _ }
+  intType       { Token TIntType _ }
+  boolType      { Token TBoolType _ }
+  voidType      { Token TVoidType _ }
  
-  '('            { TLPar $$ }
-  ')'            { TRPar $$ }
-  '{'            { TLBrace $$ }
-  '}'            { TRBrace $$ }
-  ';'            { TSemi $$ }
-  ','            { TComma $$ }
+  '('           { Token TLPar _ }
+  ')'           { Token TRPar _ }
+  '{'           { Token TLBrace _ }
+  '}'           { Token TRBrace _ }
+  ';'           { Token TSemi _ }
+  ','           { Token TComma _ }
  
-  '='            { TAssign $$ }
-  '||'           { TOr $$ }
-  '&&'           { TAnd $$ }
-  '=='           { TEqual $$ }
-  '!='           { TNEqual $$ }
-  '<'            { TLessThan $$ }
-  '>'            { TGreaterThan $$ }
-  '<='           { TLEQ $$ }
-  '>='           { TGEQ $$ }
-  '+'            { TAdd $$ }
-  '-'            { TSub $$ }
-  '*'            { TMul $$ }
-  '/'            { TDiv $$ }
-  '!'            { TNot $$ }
+  '='           { Token TAssign _ }
+  '||'          { Token TOr _ }
+  '&&'          { Token TAnd _ }
+  '=='          { Token TEqual _ }
+  '!='          { Token TNEqual _ }
+  '<'           { Token TLessThan _ }
+  '>'           { Token TGreaterThan _ }
+  '<='          { Token TLEQ _ }
+  '>='          { Token TGEQ _ }
+  '+'           { Token TAdd _ }
+  '-'           { Token TSub _ }
+  '*'           { Token TMul _ }
+  '/'           { Token TDiv _ }
+  '!'           { Token TNot _ }
 
-  boolean       { TBoolean }
-  int           { TInteger }
-  var           { TVar  }
+  boolean       { Token (TBoolean $$) _ }
+  int           { Token (TInteger $$) _ }
+  var           { Token (TVar     $$) _ }
 
 
 %% 
@@ -66,7 +66,9 @@ Factor
 {
 
 parseError :: [Token] -> a
-parseError _ = error "Parse error"
+parseError [] = error $ "Parse error, unexpected EOF" 
+parseError (Token t p:_) = 
+  error $ "Parse error, unexpected " ++ show t ++ " at " ++ printAlexPosn p
 
 data Exp = 
     Plus Exp Term 
@@ -83,7 +85,7 @@ data Term =
 data Factor = 
     Int Int 
   | Var String
-  | Brack Exp AlexPosn
+  | Brack Exp 
   deriving Show
 
 

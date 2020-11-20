@@ -171,14 +171,14 @@ happyReduction_6 (HappyAbsSyn6  happy_var_1)
 happyReduction_6 _  = notHappyAtAll 
 
 happyReduce_7 = happySpecReduce_1  6 happyReduction_7
-happyReduction_7 (HappyTerminal happy_var_1)
+happyReduction_7 (HappyTerminal (Token (TInteger happy_var_1) _))
 	 =  HappyAbsSyn6
 		 (Int happy_var_1
 	)
 happyReduction_7 _  = notHappyAtAll 
 
 happyReduce_8 = happySpecReduce_1  6 happyReduction_8
-happyReduction_8 (HappyTerminal happy_var_1)
+happyReduction_8 (HappyTerminal (Token (TVar     happy_var_1) _))
 	 =  HappyAbsSyn6
 		 (Var happy_var_1
 	)
@@ -199,36 +199,36 @@ happyNewToken action sts stk [] =
 happyNewToken action sts stk (tk:tks) =
 	let cont i = action i i tk (HappyState action) sts stk tks in
 	case tk of {
-	TIf happy_dollar_dollar -> cont 7;
-	TElse happy_dollar_dollar -> cont 8;
-	TWhile happy_dollar_dollar -> cont 9;
-	TReturn happy_dollar_dollar -> cont 10;
-	TIntType happy_dollar_dollar -> cont 11;
-	TBoolType happy_dollar_dollar -> cont 12;
-	TVoidType happy_dollar_dollar -> cont 13;
-	TLPar happy_dollar_dollar -> cont 14;
-	TRPar happy_dollar_dollar -> cont 15;
-	TLBrace happy_dollar_dollar -> cont 16;
-	TRBrace happy_dollar_dollar -> cont 17;
-	TSemi happy_dollar_dollar -> cont 18;
-	TComma happy_dollar_dollar -> cont 19;
-	TAssign happy_dollar_dollar -> cont 20;
-	TOr happy_dollar_dollar -> cont 21;
-	TAnd happy_dollar_dollar -> cont 22;
-	TEqual happy_dollar_dollar -> cont 23;
-	TNEqual happy_dollar_dollar -> cont 24;
-	TLessThan happy_dollar_dollar -> cont 25;
-	TGreaterThan happy_dollar_dollar -> cont 26;
-	TLEQ happy_dollar_dollar -> cont 27;
-	TGEQ happy_dollar_dollar -> cont 28;
-	TAdd happy_dollar_dollar -> cont 29;
-	TSub happy_dollar_dollar -> cont 30;
-	TMul happy_dollar_dollar -> cont 31;
-	TDiv happy_dollar_dollar -> cont 32;
-	TNot happy_dollar_dollar -> cont 33;
-	TBoolean -> cont 34;
-	TInteger -> cont 35;
-	TVar -> cont 36;
+	Token TIf _ -> cont 7;
+	Token TElse _ -> cont 8;
+	Token TWhile _ -> cont 9;
+	Token TReturn _ -> cont 10;
+	Token TIntType _ -> cont 11;
+	Token TBoolType _ -> cont 12;
+	Token TVoidType _ -> cont 13;
+	Token TLPar _ -> cont 14;
+	Token TRPar _ -> cont 15;
+	Token TLBrace _ -> cont 16;
+	Token TRBrace _ -> cont 17;
+	Token TSemi _ -> cont 18;
+	Token TComma _ -> cont 19;
+	Token TAssign _ -> cont 20;
+	Token TOr _ -> cont 21;
+	Token TAnd _ -> cont 22;
+	Token TEqual _ -> cont 23;
+	Token TNEqual _ -> cont 24;
+	Token TLessThan _ -> cont 25;
+	Token TGreaterThan _ -> cont 26;
+	Token TLEQ _ -> cont 27;
+	Token TGEQ _ -> cont 28;
+	Token TAdd _ -> cont 29;
+	Token TSub _ -> cont 30;
+	Token TMul _ -> cont 31;
+	Token TDiv _ -> cont 32;
+	Token TNot _ -> cont 33;
+	Token (TBoolean happy_dollar_dollar) _ -> cont 34;
+	Token (TInteger happy_dollar_dollar) _ -> cont 35;
+	Token (TVar     happy_dollar_dollar) _ -> cont 36;
 	_ -> happyError' ((tk:tks), [])
 	}
 
@@ -265,7 +265,9 @@ happySeq = happyDontSeq
 
 
 parseError :: [Token] -> a
-parseError _ = error "Parse error"
+parseError [] = error $ "Parse error, unexpected EOF" 
+parseError (Token t p:_) = 
+  error $ "Parse error, unexpected " ++ show t ++ " at " ++ printAlexPosn p
 
 data Exp = 
     Plus Exp Term 
@@ -282,7 +284,7 @@ data Term =
 data Factor = 
     Int Int 
   | Var String
-  | Brack Exp AlexPosn
+  | Brack Exp 
   deriving Show
 {-# LINE 1 "templates/GenericTemplate.hs" #-}
 -- $Id: GenericTemplate.hs,v 1.26 2005/01/14 14:47:22 simonmar Exp $

@@ -2,7 +2,13 @@
 {-# LANGUAGE CPP #-}
 {-# LINE 1 "src/Tokens.x" #-}
 
-module Tokens (alexScanTokens, Token (..), AlexPosn (..)) where 
+module Tokens (
+    alexScanTokens
+  , Token (..)
+  , TokenType (..)
+  , AlexPosn
+  , printAlexPosn
+  ) where 
 
 #if __GLASGOW_HASKELL__ >= 603
 #include "ghcconfig.h"
@@ -6787,78 +6793,87 @@ alex_actions = array (0 :: Int, 58)
   , (0,alex_action_31)
   ]
 
-{-# LINE 49 "src/Tokens.x" #-}
+{-# LINE 55 "src/Tokens.x" #-}
 
 -- Each action has String -> Token
 
-data Token = 
-    TIf       AlexPosn
-  | TElse     AlexPosn
-  | TWhile    AlexPosn
-  | TReturn   AlexPosn
-  | TIntType  AlexPosn
-  | TBoolType AlexPosn
-  | TVoidType AlexPosn
+data TokenType = 
+    TIf       
+  | TElse     
+  | TWhile    
+  | TReturn   
+  | TIntType  
+  | TBoolType 
+  | TVoidType 
   
-  | TLPar   AlexPosn
-  | TRPar   AlexPosn
-  | TLBrace AlexPosn
-  | TRBrace AlexPosn
-  | TSemi   AlexPosn
-  | TComma  AlexPosn
+  | TLPar   
+  | TRPar   
+  | TLBrace 
+  | TRBrace 
+  | TSemi   
+  | TComma  
 
-  | TAssign AlexPosn
-  | TOr     AlexPosn
-  | TAnd    AlexPosn
-  | TEqual  AlexPosn
-  | TNEqual AlexPosn
-  | TLessThan     AlexPosn
-  | TGreaterThan     AlexPosn
-  | TLEQ    AlexPosn
-  | TGEQ    AlexPosn
-  | TAdd    AlexPosn
-  | TSub    AlexPosn
-  | TMul    AlexPosn
-  | TDiv    AlexPosn
-  | TNot    AlexPosn
+  | TAssign 
+  | TOr     
+  | TAnd    
+  | TEqual  
+  | TNEqual 
+  | TLessThan     
+  | TGreaterThan     
+  | TLEQ    
+  | TGEQ    
+  | TAdd    
+  | TSub    
+  | TMul    
+  | TDiv    
+  | TNot    
 
-  | TBoolean AlexPosn Bool
-  | TVar AlexPosn String
-  | TInteger AlexPosn Int
+  | TBoolean Bool
+  | TVar String
+  | TInteger Int
+  deriving (Eq, Show)
+
+data Token = Token TokenType AlexPosn
   deriving (Eq, Show)
 
 
-alex_action_1 = \p s -> TIf p
-alex_action_2 = \p s -> TElse p
-alex_action_3 = \p s -> TWhile p
-alex_action_4 = \p s -> TReturn p
-alex_action_5 = \p s -> TIntType p
-alex_action_6 = \p s -> TBoolType p
-alex_action_7 = \p s -> TVoidType p
-alex_action_8 = \p s -> TLPar p
-alex_action_9 = \p s -> TRPar p
-alex_action_10 = \p s -> TLBrace p
-alex_action_11 = \p s -> TRBrace p
-alex_action_12 = \p s -> TSemi p
-alex_action_13 = \p s -> TComma p
-alex_action_14 = \p s -> TAssign p
-alex_action_15 = \p s -> TOr p
-alex_action_16 = \p s -> TAnd p
-alex_action_17 = \p s -> TEqual p
-alex_action_18 = \p s -> TNEqual p
-alex_action_19 = \p s -> TLessThan p
-alex_action_20 = \p s -> TGreaterThan p
-alex_action_21 = \p s -> TLEQ p
-alex_action_22 = \p s -> TGEQ p
-alex_action_23 = \p s -> TAdd p
-alex_action_24 = \p s -> TSub p
-alex_action_25 = \p s -> TMul p
-alex_action_26 = \p s -> TDiv p
-alex_action_27 = \p s -> TNot p
-alex_action_28 = \p s -> TBoolean p True
-alex_action_29 = \p s -> TBoolean p False
-alex_action_30 =  \p s -> TInteger p (read s) 
-alex_action_31 =  \p s -> TVar p s 
+printAlexPosn :: AlexPosn -> String
+printAlexPosn (AlexPosn _ line col) = 
+  show line ++ ":" ++ show col
+
+
+
+alex_action_1 = \p s -> Token TIf p
+alex_action_2 = \p s -> Token TElse p
+alex_action_3 = \p s -> Token TWhile p
+alex_action_4 = \p s -> Token TReturn p
+alex_action_5 = \p s -> Token TIntType p
+alex_action_6 = \p s -> Token TBoolType p
+alex_action_7 = \p s -> Token TVoidType p
+alex_action_8 = \p s -> Token TLPar p
+alex_action_9 = \p s -> Token TRPar p
+alex_action_10 = \p s -> Token TLBrace p
+alex_action_11 = \p s -> Token TRBrace p
+alex_action_12 = \p s -> Token TSemi p
+alex_action_13 = \p s -> Token TComma p
+alex_action_14 = \p s -> Token TAssign p
+alex_action_15 = \p s -> Token TOr p
+alex_action_16 = \p s -> Token TAnd p
+alex_action_17 = \p s -> Token TEqual p
+alex_action_18 = \p s -> Token TNEqual p
+alex_action_19 = \p s -> Token TLessThan p
+alex_action_20 = \p s -> Token TGreaterThan p
+alex_action_21 = \p s -> Token TLEQ p
+alex_action_22 = \p s -> Token TGEQ p
+alex_action_23 = \p s -> Token TAdd p
+alex_action_24 = \p s -> Token TSub p
+alex_action_25 = \p s -> Token TMul p
+alex_action_26 = \p s -> Token TDiv p
+alex_action_27 = \p s -> Token TNot p
+alex_action_28 = \p s -> Token (TBoolean True) p 
+alex_action_29 = \p s -> Token (TBoolean False) p 
+alex_action_30 = \p s -> Token (TInteger (read s)) p 
+alex_action_31 = \p s -> Token (TVar s) p 
 {-# LINE 1 "templates/GenericTemplate.hs" #-}
 -- -----------------------------------------------------------------------------
 -- ALEX TEMPLATE

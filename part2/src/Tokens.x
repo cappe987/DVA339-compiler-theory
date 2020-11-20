@@ -1,5 +1,11 @@
 {
-module Tokens (alexScanTokens, Token (..), AlexPosn (..)) where 
+module Tokens (
+    alexScanTokens
+  , Token (..)
+  , TokenType (..)
+  , AlexPosn
+  , printAlexPosn
+  ) where 
 }
 
 %wrapper "posn"
@@ -10,79 +16,88 @@ $alpha = [a-zA-z] -- alpha
 
 tokens :- 
   $white+       ;
-  if            {\p s -> TIf p}
-  else          {\p s -> TElse p}
-  while         {\p s -> TWhile p}
-  return        {\p s -> TReturn p}
-  int           {\p s -> TIntType p}
-  bool          {\p s -> TBoolType p}
-  void          {\p s -> TVoidType p}
+  if            {\p s -> Token TIf p}
+  else          {\p s -> Token TElse p}
+  while         {\p s -> Token TWhile p}
+  return        {\p s -> Token TReturn p}
+  int           {\p s -> Token TIntType p}
+  bool          {\p s -> Token TBoolType p}
+  void          {\p s -> Token TVoidType p}
   
-  \(            {\p s -> TLPar p}
-  \)            {\p s -> TRPar p}
-  \{            {\p s -> TLBrace p}
-  \}            {\p s -> TRBrace p}
-  \;            {\p s -> TSemi p}
-  \,            {\p s -> TComma p}
+  \(            {\p s -> Token TLPar p}
+  \)            {\p s -> Token TRPar p}
+  \{            {\p s -> Token TLBrace p}
+  \}            {\p s -> Token TRBrace p}
+  \;            {\p s -> Token TSemi p}
+  \,            {\p s -> Token TComma p}
 
-  \=            {\p s -> TAssign p}
-  \|\|          {\p s -> TOr p}
-  &&            {\p s -> TAnd p}
-  \=\=          {\p s -> TEqual p}
-  \!\=          {\p s -> TNEqual p}
-  \<            {\p s -> TLessThan p}
-  \>            {\p s -> TGreaterThan p}
-  \<\=          {\p s -> TLEQ p}
-  \>\=          {\p s -> TGEQ p}
-  \+            {\p s -> TAdd p}
-  \-            {\p s -> TSub p}
-  \*            {\p s -> TMul p}
-  \/            {\p s -> TDiv p}
-  \!            {\p s -> TNot p}
+  \=            {\p s -> Token TAssign p}
+  \|\|          {\p s -> Token TOr p}
+  &&            {\p s -> Token TAnd p}
+  \=\=          {\p s -> Token TEqual p}
+  \!\=          {\p s -> Token TNEqual p}
+  \<            {\p s -> Token TLessThan p}
+  \>            {\p s -> Token TGreaterThan p}
+  \<\=          {\p s -> Token TLEQ p}
+  \>\=          {\p s -> Token TGEQ p}
+  \+            {\p s -> Token TAdd p}
+  \-            {\p s -> Token TSub p}
+  \*            {\p s -> Token TMul p}
+  \/            {\p s -> Token TDiv p}
+  \!            {\p s -> Token TNot p}
 
-  true          {\p s -> TBoolean p True}
-  false         {\p s -> TBoolean p False}
-  $digit+     { \p s -> TInteger p (read s) }
-  $alpha [$alpha $digit \_]*   { \p s -> TVar p s }
+  true          {\p s -> Token (TBoolean True) p }
+  false         {\p s -> Token (TBoolean False) p }
+  $digit+       {\p s -> Token (TInteger (read s)) p }
+  $alpha [$alpha $digit \_]*   {\p s -> Token (TVar s) p }
 
 
 {
 -- Each action has String -> Token
 
-data Token = 
-    TIf       AlexPosn
-  | TElse     AlexPosn
-  | TWhile    AlexPosn
-  | TReturn   AlexPosn
-  | TIntType  AlexPosn
-  | TBoolType AlexPosn
-  | TVoidType AlexPosn
+data TokenType = 
+    TIf       
+  | TElse     
+  | TWhile    
+  | TReturn   
+  | TIntType  
+  | TBoolType 
+  | TVoidType 
   
-  | TLPar   AlexPosn
-  | TRPar   AlexPosn
-  | TLBrace AlexPosn
-  | TRBrace AlexPosn
-  | TSemi   AlexPosn
-  | TComma  AlexPosn
+  | TLPar   
+  | TRPar   
+  | TLBrace 
+  | TRBrace 
+  | TSemi   
+  | TComma  
 
-  | TAssign AlexPosn
-  | TOr     AlexPosn
-  | TAnd    AlexPosn
-  | TEqual  AlexPosn
-  | TNEqual AlexPosn
-  | TLessThan     AlexPosn
-  | TGreaterThan     AlexPosn
-  | TLEQ    AlexPosn
-  | TGEQ    AlexPosn
-  | TAdd    AlexPosn
-  | TSub    AlexPosn
-  | TMul    AlexPosn
-  | TDiv    AlexPosn
-  | TNot    AlexPosn
+  | TAssign 
+  | TOr     
+  | TAnd    
+  | TEqual  
+  | TNEqual 
+  | TLessThan     
+  | TGreaterThan     
+  | TLEQ    
+  | TGEQ    
+  | TAdd    
+  | TSub    
+  | TMul    
+  | TDiv    
+  | TNot    
 
-  | TBoolean AlexPosn Bool
-  | TVar AlexPosn String
-  | TInteger AlexPosn Int
+  | TBoolean Bool
+  | TVar String
+  | TInteger Int
   deriving (Eq, Show)
+
+data Token = Token TokenType AlexPosn
+  deriving (Eq, Show)
+
+
+printAlexPosn :: AlexPosn -> String
+printAlexPosn (AlexPn _ line col) = 
+  show line ++ ":" ++ show col
+
 
 }

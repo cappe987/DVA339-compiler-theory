@@ -8,4 +8,4 @@ import HappyParser
 someFunc :: IO ()
 someFunc = do
   s <- getContents
-  print $ alexScanTokens s
+  print $ happyParser $ alexScanTokens s
