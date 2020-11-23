@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -w #-}
 module HappyParser where
 import Tokens
+import Either
 import qualified Data.Array as Happy_Data_Array
 import qualified Data.Bits as Bits
 import Control.Applicative(Applicative(..))
@@ -235,34 +236,25 @@ happyNewToken action sts stk (tk:tks) =
 happyError_ explist 37 tk tks = happyError' (tks, explist)
 happyError_ explist _ tk tks = happyError' ((tk:tks), explist)
 
-newtype HappyIdentity a = HappyIdentity a
-happyIdentity = HappyIdentity
-happyRunIdentity (HappyIdentity a) = a
-
-instance Functor HappyIdentity where
-    fmap f (HappyIdentity a) = HappyIdentity (f a)
-
-instance Applicative HappyIdentity where
-    pure  = HappyIdentity
-    (<*>) = ap
-instance Monad HappyIdentity where
-    return = pure
-    (HappyIdentity p) >>= q = q p
-
-happyThen :: () => HappyIdentity a -> (a -> HappyIdentity b) -> HappyIdentity b
-happyThen = (>>=)
-happyReturn :: () => a -> HappyIdentity a
-happyReturn = (return)
-happyThen1 m k tks = (>>=) m (\a -> k a tks)
-happyReturn1 :: () => a -> b -> HappyIdentity a
-happyReturn1 = \a tks -> (return) a
-happyError' :: () => ([(Token)], [String]) -> HappyIdentity a
-happyError' = HappyIdentity . (\(tokens, _) -> parseError tokens)
-happyParser tks = happyRunIdentity happySomeParser where
+happyThen :: () => Either a -> (a -> Either b) -> Either b
+happyThen = (eitherBind)
+happyReturn :: () => a -> Either a
+happyReturn = (eitherReturn)
+happyThen1 m k tks = (eitherBind) m (\a -> k a tks)
+happyReturn1 :: () => a -> b -> Either a
+happyReturn1 = \a tks -> (eitherReturn) a
+happyError' :: () => ([(Token)], [String]) -> Either a
+happyError' = (\(tokens, _) -> parseError tokens)
+happyParser tks = happySomeParser where
  happySomeParser = happyThen (happyParse action_0 tks) (\x -> case x of {HappyAbsSyn4 z -> happyReturn z; _other -> notHappyAtAll })
 
 happySeq = happyDontSeq
 
+
+eitherBind :: Either a String -> (a -> Either b) -> Either b String
+eitherBind = (>>=)
+
+eitherReturn = Right 
 
 parseError :: [Token] -> a
 parseError [] = error $ "Parse error, unexpected EOF" 

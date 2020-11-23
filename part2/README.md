@@ -1,5 +1,6 @@
 # part2
 
+Generated lexer and parser using the libraries Alex and Happy.
 
 # Grammar of the language
 ```
