@@ -10,35 +10,35 @@ import Tokens
 %monad { E } { eitherBind } { Ok }
 
 %token 
-  if            { Token TIf _ }
-  else          { Token TElse _ }
-  while         { Token TWhile _ }
-  return        { Token TReturn _ }
-  intType       { Token TIntType _ }
-  boolType      { Token TBoolType _ }
-  voidType      { Token TVoidType _ }
+  if            { Token TIf $$ }
+  else          { Token TElse $$ }
+  while         { Token TWhile $$ }
+  return        { Token TReturn $$ }
+  intType       { Token TIntType $$ }
+  boolType      { Token TBoolType $$ }
+  voidType      { Token TVoidType $$ }
  
-  '('           { Token TLPar _ }
-  ')'           { Token TRPar _ }
-  '{'           { Token TLBrace _ }
-  '}'           { Token TRBrace _ }
-  ';'           { Token TSemi _ }
-  ','           { Token TComma _ }
+  '('           { Token TLPar $$ }
+  ')'           { Token TRPar $$ }
+  '{'           { Token TLBrace $$ }
+  '}'           { Token TRBrace $$ }
+  ';'           { Token TSemi $$ }
+  ','           { Token TComma $$ }
  
-  '='           { Token TAssign _ }
-  '||'          { Token TOr _ }
-  '&&'          { Token TAnd _ }
-  '=='          { Token TEqual _ }
-  '!='          { Token TNEqual _ }
-  '<'           { Token TLessThan _ }
-  '>'           { Token TGreaterThan _ }
-  '<='          { Token TLEQ _ }
-  '>='          { Token TGEQ _ }
-  '+'           { Token TAdd _ }
-  '-'           { Token TSub _ }
-  '*'           { Token TMul _ }
-  '/'           { Token TDiv _ }
-  '!'           { Token TNot _ }
+  '='           { Token TAssign $$ }
+  '||'          { Token TOr $$ }
+  '&&'          { Token TAnd $$ }
+  '=='          { Token TEqual $$ }
+  '!='          { Token TNEqual $$ }
+  '<'           { Token TLessThan $$ }
+  '>'           { Token TGreaterThan $$ }
+  '<='          { Token TLEQ $$ }
+  '>='          { Token TGEQ $$ }
+  '+'           { Token TAdd $$ }
+  '-'           { Token TSub $$ }
+  '*'           { Token TMul $$ }
+  '/'           { Token TDiv $$ }
+  '!'           { Token TNot $$ }
 
   boolean       { Token (TBoolean $$) _ }
   int           { Token (TInteger $$) _ }
@@ -52,7 +52,6 @@ import Tokens
 %left '<' '>' '<=' '>='
 %left '+' '-'
 %left '*' '/'
-%left '-'
 
 
 %% 
@@ -62,21 +61,21 @@ Program
   | Decl Program { $1 : $2 }
 
 Decl 
-  : Type     var '(' FormalList ')' '{' Stmnts '}'  { FunctionWReturn $1 $2 $4 $7 } 
-  | voidType var '(' FormalList ')' '{' Stmnts '}'  { VoidFunction $2 $4 $7 }
+  : Type     var '(' FormalList ')' '{' Stmnts '}'  { FunctionWReturn $1 ((uncurry Id) $2) $4 $7 } 
+  | voidType var '(' FormalList ')' '{' Stmnts '}'  { VoidFunction ((uncurry Id) $2) $4 $7 }
 
 FormalList 
   : {- empty -} { [] }
-  | Type var FormalListMore {Variable $1 $2 : $3}
+  | Type var FormalListMore {Variable $1 ((uncurry Id) $2) : $3}
 
 -- For when more than 1 parameter
 FormalListMore 
   : {- empty -} { [] }
-  | ',' Type var FormalListMore   {Variable $2 $3 : $4} 
+  | ',' Type var FormalListMore   {Variable $2 ((uncurry Id) $3) : $4} 
 
 Type 
-  : intType  { IntType  }
-  | boolType { BoolType }
+  : intType  { IntType $1 }
+  | boolType { BoolType $1 }
 
 -- Zero or more statements 
 Stmnts :: { [Stmnt] }
@@ -86,12 +85,12 @@ Stmnts :: { [Stmnt] }
 -- A single statement.
 Stmnt :: { Stmnt }
   : Expr ';'                         { Expr $1 }
-  | return ';'                       { ReturnVoid }
-  | return Expr ';'                  { Return $2 }
-  | if '(' Expr ')' Stmnt            { If $3 $5 }
-  | if '(' Expr ')' Stmnt else Stmnt { IfElse $3 $5 $7 }
-  | while '(' Expr ')' Stmnt         { While $3 $5 }
-  | Type var ';'                     { VariableDecl (Variable $1 $2)}
+  | return ';'                       { ReturnVoid $1}
+  | return Expr ';'                  { Return $1 $2 }
+  | if '(' Expr ')' Stmnt            { If $1 $3 $5 }
+  | if '(' Expr ')' Stmnt else Stmnt { IfElse $1 $6 $3 $5 $7 }
+  | while '(' Expr ')' Stmnt         { While $1 $3 $5 }
+  | Type var ';'                     { VariableDecl (Variable $1 ((uncurry Id) $2))}
   | '{' Stmnts '}'                   { StmntList $2 }
 
 
@@ -104,29 +103,29 @@ ExprListMore
   | ',' Expr ExprListMore { $2 : $3 }
 
 Expr 
-  : var '=' Expr     { Asn $1 $3 }
-  | var '(' ExprList ')'  { Call $1 $3 }
-  | '-' Expr         { Neg $2 }
-  | '!' Expr         { Not $2 }
-  | Expr '||' Expr   { Or $1 $3 }
-  | Expr '&&' Expr   { And $1 $3 }
+  : var '=' Expr     { Asn $2 ((uncurry Id) $1) $3 }
+  | var '(' ExprList ')'  { Call ((uncurry Id) $1) $3 }
+  | '-' Expr         { Neg $1 $2 }
+  | '!' Expr         { Not $1 $2 }
+  | Expr '||' Expr   { Or $2 $1 $3 }
+  | Expr '&&' Expr   { And $2 $1 $3 }
 
-  | Expr '+' Expr    { Plus $1 $3 }
-  | Expr '-' Expr    { Minus  $1 $3 }
-  | Expr '*' Expr    { Times $1 $3 }
-  | Expr '/' Expr    { Div $1 $3 }
+  | Expr '+' Expr    { Plus $2 $1 $3 }
+  | Expr '-' Expr    { Minus $2 $1 $3 }
+  | Expr '*' Expr    { Times $2 $1 $3 }
+  | Expr '/' Expr    { Div $2 $1 $3 }
 
-  | Expr '>' Expr    { GreaterThan $1 $3 }
-  | Expr '<' Expr    { LessThan $1 $3 }
-  | Expr '>=' Expr   { GEQ $1 $3 }
-  | Expr '<=' Expr   { LEQ $1 $3 }
-  | Expr '==' Expr   { Equal $1 $3}
-  | Expr '!=' Expr   { NEqual $1 $3}
+  | Expr '>' Expr    { GreaterThan $2 $1 $3 }
+  | Expr '<' Expr    { LessThan $2 $1 $3 }
+  | Expr '>=' Expr   { GEQ $2 $1 $3 }
+  | Expr '<=' Expr   { LEQ $2 $1 $3 }
+  | Expr '==' Expr   { Equal $2  $1 $3 }
+  | Expr '!=' Expr   { NEqual $2  $1 $3 }
 
-  | int              { Int $1 }
-  | boolean          { Boolean $1 }
-  | var              { Var $1 }
-  | '(' Expr ')'     { Brack $2}
+  | int              { (uncurry Int) $1 }
+  | boolean          { (uncurry Boolean) $1 }
+  | var              { Var ((uncurry Id) $1) }
+  | '(' Expr ')'     { $2}
 
 {
 
@@ -150,55 +149,59 @@ parseError (Token t p:xs) =
 type Program = [Decl]
 
 data Decl 
-  = FunctionWReturn Type String [Variable] [Stmnt]
-  | VoidFunction String [Variable] [Stmnt]
+  = FunctionWReturn Type Id [Variable] [Stmnt]
+  | VoidFunction Id [Variable] [Stmnt]
   deriving Show
 
 type Statements = [Stmnt]
 
-data Variable = Variable Type String
+data Variable = Variable Type Id
   deriving Show
 
 data Stmnt 
-  = ReturnVoid
-  | Return Expr
-  | Expr Expr
-  | Type String
-  | If Expr Stmnt
-  | IfElse Expr Stmnt Stmnt
-  | While Expr Stmnt
-  | StmntList [Stmnt]
-  | VariableDecl Variable
+  = ReturnVoid      AlexPosn
+  | Return          AlexPosn Expr
+  | Expr            Expr
+  | If              AlexPosn Expr Stmnt
+  | IfElse          AlexPosn AlexPosn Expr Stmnt Stmnt
+  | While           AlexPosn Expr Stmnt
+  | StmntList       [Stmnt]
+  | VariableDecl    Variable
+--  | Type AlexPosn String
   deriving Show
 
-data Type = IntType | BoolType deriving Show
+data Type = IntType AlexPosn | BoolType AlexPosn deriving Show
 
 type ExprList = [Expr]
 
 data Expr 
-  = Plus        Expr Expr
-  | Minus       Expr Expr
-  | Times       Expr Expr
-  | Div         Expr Expr
-  | Equal       Expr Expr
-  | NEqual      Expr Expr
-  | LessThan    Expr Expr
-  | GreaterThan Expr Expr
-  | LEQ         Expr Expr
-  | GEQ         Expr Expr
-  | Or          Expr Expr
-  | And         Expr Expr
-  | Not         Expr
-  | Neg         Expr
+  = Plus        AlexPosn Expr Expr
+  | Minus       AlexPosn Expr Expr
+  | Times       AlexPosn Expr Expr
+  | Div         AlexPosn Expr Expr
+  | Equal       AlexPosn Expr Expr
+  | NEqual      AlexPosn Expr Expr
+  | LessThan    AlexPosn Expr Expr
+  | GreaterThan AlexPosn Expr Expr
+  | LEQ         AlexPosn Expr Expr
+  | GEQ         AlexPosn Expr Expr
+  | Or          AlexPosn Expr Expr
+  | And         AlexPosn Expr Expr
+  | Not         AlexPosn Expr
+  | Neg         AlexPosn Expr
 
-  | Asn         String Expr
-  | Int         Int 
-  | Var         String
-  | Boolean     Bool
-  | Brack       Expr 
-  | Call        String [Expr]
+  | Asn         AlexPosn Id Expr
+  | Int         AlexPosn Int 
+  | Var         Id
+  | Boolean     AlexPosn Bool
+  | Call        Id [Expr]
+--    | Brack       Expr 
 --  | Term Term
   deriving Show
+
+data Id = Id AlexPosn String
+  deriving Show
+
 
 -- data Term = 
 --    Times Term Factor 

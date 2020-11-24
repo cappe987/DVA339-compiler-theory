@@ -46,10 +46,10 @@ tokens :-
   \/            {\p s -> Token TDiv p}
   \!            {\p s -> Token TNot p}
 
-  true          {\p s -> Token (TBoolean True) p }
-  false         {\p s -> Token (TBoolean False) p }
-  $digit+       {\p s -> Token (TInteger (read s)) p }
-  $alpha [$alpha $digit \_]*   {\p s -> Token (TVar s) p }
+  true          {\p s -> Token (TBoolean (p, True)) p }
+  false         {\p s -> Token (TBoolean (p, False)) p }
+  $digit+       {\p s -> Token (TInteger (p, (read s))) p }
+  $alpha [$alpha $digit \_]*   {\p s -> Token (TVar (p, s)) p }
 
 
 {
@@ -86,9 +86,9 @@ data TokenType =
   | TDiv    
   | TNot    
 
-  | TBoolean Bool
-  | TVar String
-  | TInteger Int
+  | TBoolean (AlexPosn, Bool)
+  | TVar (AlexPosn, String)
+  | TInteger (AlexPosn, Int)
   deriving (Eq, Show)
 
 data Token = Token TokenType AlexPosn

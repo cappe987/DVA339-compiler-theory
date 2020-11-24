@@ -6828,9 +6828,9 @@ data TokenType =
   | TDiv    
   | TNot    
 
-  | TBoolean Bool
-  | TVar String
-  | TInteger Int
+  | TBoolean (AlexPosn, Bool)
+  | TVar (AlexPosn, String)
+  | TInteger (AlexPosn, Int)
   deriving (Eq, Show)
 
 data Token = Token TokenType AlexPosn
@@ -6838,7 +6838,7 @@ data Token = Token TokenType AlexPosn
 
 
 printAlexPosn :: AlexPosn -> String
-printAlexPosn (AlexPosn _ line col) = 
+printAlexPosn (AlexPn _ line col) = 
   show line ++ ":" ++ show col
 
 
@@ -6870,10 +6870,10 @@ alex_action_24 = \p s -> Token TSub p
 alex_action_25 = \p s -> Token TMul p
 alex_action_26 = \p s -> Token TDiv p
 alex_action_27 = \p s -> Token TNot p
-alex_action_28 = \p s -> Token (TBoolean True) p 
-alex_action_29 = \p s -> Token (TBoolean False) p 
-alex_action_30 = \p s -> Token (TInteger (read s)) p 
-alex_action_31 = \p s -> Token (TVar s) p 
+alex_action_28 = \p s -> Token (TBoolean (p, True)) p 
+alex_action_29 = \p s -> Token (TBoolean (p, False)) p 
+alex_action_30 = \p s -> Token (TInteger (p, (read s))) p 
+alex_action_31 = \p s -> Token (TVar (p, s)) p 
 {-# LINE 1 "templates/GenericTemplate.hs" #-}
 -- -----------------------------------------------------------------------------
 -- ALEX TEMPLATE
