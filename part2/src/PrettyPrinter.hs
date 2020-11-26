@@ -6,21 +6,6 @@ import HappyParser
 import Tokens
 import Debug.Trace
 
--- type Doc = String
-
-
-
--- nest :: Int -> String -> String
--- nest i = 
---   foldr (\c acc -> if c == '\n' then '\n':indent++acc else c:acc) "" 
---   where 
---     indent = intercalate "" $ replicate i " "
-    -- addIndent ('\n':xs) = 
-
-
--- line = "\n"
-
-
 
 data  Doc 
   = Nil
@@ -173,37 +158,44 @@ showVariable :: Variable -> Doc
 showVariable (Variable vartype id) = showType vartype <> text " " <> showId id 
 
 
--- isStmntList:: Stmnt -> Bool
--- isStmntList (StmntList _) = True
--- isStmntList _             = False
+isStmntList:: Stmnt -> Bool
+isStmntList (StmntList _) = True
+isStmntList _             = False
 
 showVariables :: [Variable] -> Doc
 showVariables []   = nil
 showVariables [v]  = showVariable v
 showVariables (v:vs) = showVariable v <> text ", " <> showVariables vs
 
+showBody :: Stmnt -> Doc
+showBody s = 
+  if isStmntList s then showStmnt s else nest 2(line <> showStmnt s)
+
 showStmnt :: Stmnt -> Doc
-showStmnt (ReturnVoid     _) = text "return;" <> line
-showStmnt (Return       _ e) = text "return " <> showExpr e 0 False <> text ";" <> line
-showStmnt (Expr           e) = showExpr e 0 False <> text ";" <> line
-showStmnt (VariableDecl var) = showVariable var <> text ";" <> line
+showStmnt (ReturnVoid     _) = text "return;" 
+showStmnt (Return       _ e) = text "return " <> showExpr e 0 False <> text ";" 
+showStmnt (Expr           e) = showExpr e 0 False <> text ";" 
+showStmnt (VariableDecl var) = showVariable var <> text ";" 
 showStmnt (StmntList     es) = 
-  text "{" <> line 
-    <> foldl (\doc s -> doc <> showStmnt s) nil es 
-    <> text "}" <> line
+  text "{" 
+    <> nest 2 (foldl (\doc s -> doc <> line <> showStmnt s) nil es)
+    <> line 
+    <> text "}" 
+    -- <> line
 
 showStmnt (If     _ e s) = 
   text "if(" <> showExpr e 0 False <> text ") "
-    <> nest 2 (line <> showStmnt s)
+    <> showBody s
 
 showStmnt (IfElse p _ e s1 s2) = 
   showStmnt (If p e s1)
+    <> line
     <> text "else " 
-    <> nest 2 (line <> showStmnt s2)
+    <> showBody s2
 
 showStmnt (While _ e s) = 
   text "while(" <> showExpr e 0 False <> text ") "
-    <> nest 2 (line <> showStmnt s)
+    <> showBody s
 
 
 showFunction id variables stmnts = 
@@ -213,6 +205,7 @@ showFunction id variables stmnts =
     <> showVariables variables
     <> text ") {"
     <> nest 2 (line <> foldl (\doc s -> doc <> showStmnt s) nil stmnts)
+    <> line
     <> text "}"
     <> line
 
@@ -230,9 +223,3 @@ showProgram = foldl (\doc func -> doc <> showDecl func) nil
 prettyPrint :: Program -> String
 prettyPrint = layout . showProgram
 
-  -- case s of
-    -- StmntList _  -> text "if(" <> showExpr e 0 <> text ") "
-    --                   <> nest 2 (showStmnt s)
-
-    -- _            -> text "if(" <> showExpr e 0 <> text ")" 
-    --                   <> nest 2 (line <> showStmnt s) 
