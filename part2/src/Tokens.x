@@ -5,6 +5,7 @@ module Tokens (
   , TokenType (..)
   , AlexPosn
   , printAlexPosn
+  , testPos
   ) where 
 }
 
@@ -99,5 +100,7 @@ printAlexPosn :: AlexPosn -> String
 printAlexPosn (AlexPn _ line col) = 
   show line ++ ":" ++ show col
 
+testPos :: AlexPosn
+testPos = AlexPn 0 0 0
 
 }

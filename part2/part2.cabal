@@ -30,6 +30,7 @@ library
       Lib
       Tokens
       HappyParser
+      PrettyPrinter
       -- Tokens
   other-modules:
       -- Paths_part2

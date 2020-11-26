@@ -8,6 +8,7 @@ module Tokens (
   , TokenType (..)
   , AlexPosn
   , printAlexPosn
+  , testPos
   ) where 
 
 #if __GLASGOW_HASKELL__ >= 603
@@ -6793,7 +6794,7 @@ alex_actions = array (0 :: Int, 58)
   , (0,alex_action_31)
   ]
 
-{-# LINE 55 "src/Tokens.x" #-}
+{-# LINE 56 "src/Tokens.x" #-}
 
 -- Each action has String -> Token
 
@@ -6841,6 +6842,8 @@ printAlexPosn :: AlexPosn -> String
 printAlexPosn (AlexPn _ line col) = 
   show line ++ ":" ++ show col
 
+testPos :: AlexPosn
+testPos = AlexPn 0 0 0
 
 
 alex_action_1 = \p s -> Token TIf p

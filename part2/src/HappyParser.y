@@ -1,5 +1,15 @@
 {
-module HappyParser where
+module HappyParser (
+  Program (..)
+  , Decl (..)
+  , Variable (..)
+  , Stmnt (..)
+  , Type (..)
+  , Expr (..)
+  , Id (..)
+  , E (..)
+  , happyParser
+  ) where
 import Tokens
 }
 
@@ -153,8 +163,6 @@ data Decl
   | VoidFunction Id [Variable] [Stmnt]
   deriving Show
 
-type Statements = [Stmnt]
-
 data Variable = Variable Type Id
   deriving Show
 
@@ -167,12 +175,9 @@ data Stmnt
   | While           AlexPosn Expr Stmnt
   | StmntList       [Stmnt]
   | VariableDecl    Variable
---  | Type AlexPosn String
   deriving Show
 
 data Type = IntType AlexPosn | BoolType AlexPosn deriving Show
-
-type ExprList = [Expr]
 
 data Expr 
   = Plus        AlexPosn Expr Expr
@@ -195,26 +200,9 @@ data Expr
   | Var         Id
   | Boolean     AlexPosn Bool
   | Call        Id [Expr]
---    | Brack       Expr 
---  | Term Term
   deriving Show
 
 data Id = Id AlexPosn String
   deriving Show
-
-
--- data Term = 
---    Times Term Factor 
---  | Div Term Factor 
---  | Factor Factor
---  deriving Show
-
--- data Factor = 
---    Int Int 
---  | Var String
---  | Brack Expr 
---  deriving Show
-
-
 
 }
