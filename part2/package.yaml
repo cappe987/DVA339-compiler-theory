@@ -21,9 +21,16 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- array == 0.5.4.0
 
 library:
-  source-dirs: src
+  source-dirs: src/
+  exposed-modules:
+    - HappyParser
+    - Tokens
+    - PrettyPrinter
+    - Lib
+
 
 executables:
   part2-exe:
