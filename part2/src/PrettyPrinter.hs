@@ -4,6 +4,7 @@ module PrettyPrinter where
 -- import Data.List
 import HappyParser
 import Tokens
+import Debug.Trace
 
 -- type Doc = String
 
@@ -101,30 +102,64 @@ getExprs (Minus       _ e1 e2) = (e1, e2)
 getExprs (Times       _ e1 e2) = (e1, e2) 
 getExprs (Div         _ e1 e2) = (e1, e2) 
 
+associativity Or          {} = ABoth
+associativity And         {} = ABoth
+associativity Equal       {} = ALeft
+associativity NEqual      {} = ALeft
+associativity LessThan    {} = ALeft
+associativity GreaterThan {} = ALeft
+associativity LEQ         {} = ALeft
+associativity GEQ         {} = ALeft
+associativity Plus        {} = ABoth 
+associativity Minus       {} = ALeft
+associativity Times       {} = ABoth
+associativity Div         {} = ALeft
 
-showExpr :: Expr -> Int -> Doc
-showExpr (Asn _ id expr  ) _ = showId id <> text " = " <> showExpr expr 1
-showExpr (Int _ i        ) _ = text $ show i
-showExpr (Var id         ) _ = showId id
-showExpr (Boolean _ True ) _ = text "true"
-showExpr (Boolean _ False) _ = text "false"
-showExpr (Not _ e        ) _ = text "!" <> showExpr e 8
-showExpr (Neg _ e        ) _ = text "-" <> showExpr e 8
+data Associativity = ALeft | ARight | ABoth 
+  deriving (Show, Eq)
 
-showExpr (Call id es     ) _ = 
+
+showExprList []     = nil 
+showExprList [e]    = showExpr e 0 False
+showExprList (e:es) = showExpr e 0 False <> text ", " <> showExprList es
+
+showExpr :: Expr -> Int -> Bool -> Doc
+showExpr (Asn _ id expr  ) prevPrec opposite = 
+  if prevPrec > 1 || opposite && prevPrec == 1 then 
+    text "(" <> showId id <> text " = " <> showExpr expr 1 False <> text ")"
+  else
+    showId id <> text " = " <> showExpr expr 1 False
+
+showExpr (Int _ i        ) _ _ = text $ show i
+showExpr (Var id         ) _ _ = showId id
+showExpr (Boolean _ True ) _ _ = text "true"
+showExpr (Boolean _ False) _ _ = text "false"
+showExpr (Not _ e        ) _ _ = 
+    text "!" <> showExpr e 8 False
+showExpr (Neg _ e        ) _ _ = 
+    text "-" <> showExpr e 8 False
+
+showExpr (Call id es     ) _ _ = 
   showId id <> text "(" 
-    <> foldl (\doc e -> doc <> showExpr e 0) nil es
+    <> showExprList es
     <> text ")"
 
-showExpr binOp prevPrec  = 
-  if prevPrec > currPrec then -- adds parentheses if parent had higher precedence
-    text "(" <> showExpr e1 currPrec 
-      <> binOpDoc binOp <> showExpr e2 currPrec <> text ")"
+showExpr binOp prevPrec opposite = 
+  if prevPrec > currPrec || opposite && prevPrec == currPrec then 
+    text "(" 
+      <> showExpr e1 currPrec assleft
+      <> binOpDoc binOp 
+      <> showExpr e2 currPrec assright
+      <> text ")"
   else
-    showExpr e1 currPrec <> binOpDoc binOp <> showExpr e2 currPrec
-  
+    showExpr e1 currPrec assleft 
+      <> binOpDoc binOp 
+      <> showExpr e2 currPrec assright
+    
   where currPrec = getPrecedence binOp
         (e1, e2) = getExprs binOp
+        assleft  = associativity binOp == ARight
+        assright = associativity binOp == ALeft
 
 
 showType :: Type -> Doc
@@ -142,11 +177,15 @@ showVariable (Variable vartype id) = showType vartype <> text " " <> showId id
 -- isStmntList (StmntList _) = True
 -- isStmntList _             = False
 
+showVariables :: [Variable] -> Doc
+showVariables []   = nil
+showVariables [v]  = showVariable v
+showVariables (v:vs) = showVariable v <> text ", " <> showVariables vs
 
 showStmnt :: Stmnt -> Doc
 showStmnt (ReturnVoid     _) = text "return;" <> line
-showStmnt (Return       _ e) = text "return " <> showExpr e 0 <> text ";" <> line
-showStmnt (Expr           e) = showExpr e 0 <> line
+showStmnt (Return       _ e) = text "return " <> showExpr e 0 False <> text ";" <> line
+showStmnt (Expr           e) = showExpr e 0 False <> text ";" <> line
 showStmnt (VariableDecl var) = showVariable var <> text ";" <> line
 showStmnt (StmntList     es) = 
   text "{" <> line 
@@ -154,7 +193,7 @@ showStmnt (StmntList     es) =
     <> text "}" <> line
 
 showStmnt (If     _ e s) = 
-  text "if(" <> showExpr e 0 <> text ") "
+  text "if(" <> showExpr e 0 False <> text ") "
     <> nest 2 (line <> showStmnt s)
 
 showStmnt (IfElse p _ e s1 s2) = 
@@ -163,20 +202,33 @@ showStmnt (IfElse p _ e s1 s2) =
     <> nest 2 (line <> showStmnt s2)
 
 showStmnt (While _ e s) = 
-  text "while(" <> showExpr e 0 <> text ") "
+  text "while(" <> showExpr e 0 False <> text ") "
     <> nest 2 (line <> showStmnt s)
 
 
+showFunction id variables stmnts = 
+  text " " 
+    <> showId id 
+    <> text "(" 
+    <> showVariables variables
+    <> text ") {"
+    <> nest 2 (line <> foldl (\doc s -> doc <> showStmnt s) nil stmnts)
+    <> text "}"
+    <> line
 
 showDecl :: Decl -> Doc
-showDecl = undefined
+showDecl (VoidFunction id variables stmnts) = 
+  text "void" <> showFunction id variables stmnts
+showDecl (FunctionWReturn funtype id variables stmnts) = 
+  showType funtype <> showFunction id variables stmnts
+
 
 
 showProgram :: Program -> Doc
-showProgram = undefined
+showProgram = foldl (\doc func -> doc <> showDecl func) nil
 
-prettyPrint :: Decl -> IO ()
-prettyPrint = putStrLn . layout . showDecl 
+prettyPrint :: Program -> String
+prettyPrint = layout . showProgram
 
   -- case s of
     -- StmntList _  -> text "if(" <> showExpr e 0 <> text ") "

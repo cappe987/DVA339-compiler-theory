@@ -62,6 +62,8 @@ import Tokens
 %left '<' '>' '<=' '>='
 %left '+' '-'
 %left '*' '/'
+%left NEG
+%left '!'
 
 
 %% 
@@ -115,7 +117,7 @@ ExprListMore
 Expr 
   : var '=' Expr     { Asn $2 ((uncurry Id) $1) $3 }
   | var '(' ExprList ')'  { Call ((uncurry Id) $1) $3 }
-  | '-' Expr         { Neg $1 $2 }
+  | '-' Expr %prec NEG    { Neg $1 $2 }
   | '!' Expr         { Not $1 $2 }
   | Expr '||' Expr   { Or $2 $1 $3 }
   | Expr '&&' Expr   { And $2 $1 $3 }
