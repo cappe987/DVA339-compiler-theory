@@ -86,6 +86,21 @@ evalBoolOperation f e1 e2 = do
       exprError $ "Invalid type at " ++ printAlexPosn (exprPos e1) 
         ++ ". Expected bool, got " ++ show v1
 
+evalComparison :: (Int -> Int -> Bool) -> Expr -> Expr -> ExprInterpreter Value
+evalComparison f e1 e2 = do
+  v1 <- evalExpr e1
+  v2 <- evalExpr e2
+
+  if isInt v1 then 
+    if isInt v2 then
+      return $ VBool (f (toInt v1) (toInt v2))
+    else
+      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e2)
+        ++ ". Expected int, got " ++ show v2
+  else
+      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e1) 
+        ++ ". Expected int, got " ++ show v1
+
 evalExpr :: Expr -> ExprInterpreter Value
 evalExpr (Int       _ i) = return (VInt i)
 evalExpr (Boolean   _ b) = return (VBool b)
@@ -94,6 +109,30 @@ evalExpr (Minus _ e1 e2) = evalNumericOperation (-) e1 e2
 evalExpr (Times _ e1 e2) = evalNumericOperation (*) e1 e2
 evalExpr (And   _ e1 e2) = evalBoolOperation (&&) e1 e2
 evalExpr (Or    _ e1 e2) = evalBoolOperation (||) e1 e2
+evalExpr (LEQ   _ e1 e2) = evalComparison (<=) e1 e2
+evalExpr (GEQ   _ e1 e2) = evalComparison (>=) e1 e2
+evalExpr (LessThan    _ e1 e2) = evalComparison (<) e1 e2
+evalExpr (GreaterThan _ e1 e2) = evalComparison (>) e1 e2
+
+evalExpr (Neg   _ e) = do 
+  v <- evalExpr e
+  if isInt v then
+    return (VInt (-(toInt v)))
+  else
+    exprError $ "Invalid type at " ++ printAlexPosn (exprPos e) 
+      ++ ". Expected int, got " ++ show v
+
+evalExpr (Not   _ e) = do
+  v <- evalExpr e
+  if isBool v then
+    return (VBool (not $ toBool v))
+  else
+    exprError $ "Invalid type at " ++ printAlexPosn (exprPos e) 
+      ++ ". Expected int, got " ++ show v
+
+evalExpr (Asn _ id e) = undefined
+evalExpr (Var id    ) = undefined
+evalExpr (Call id es) = callFunction id es
 
 callFunction :: Id -> [Expr] -> ExprInterpreter Value
 -- callFunction id es = undefined
