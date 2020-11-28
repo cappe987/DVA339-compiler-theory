@@ -2,15 +2,25 @@ module Lib
     ( someFunc
     ) where
 
-import Tokens
+import Lex
 import HappyParser
 import PrettyPrinter
+import Interpreter
 
 someFunc :: IO ()
-someFunc = do
-  orig <- getContents
-  -- print $ happyParser $ alexScanTokens s
+someFunc = test23
 
+
+test21 :: IO ()
+test21 = do 
+  orig <- getContents
+  case happyParser $ alexScanTokens orig of 
+    Error _ -> putStrLn "false"
+    Ok    _ -> putStrLn "true"
+
+test22 :: IO ()
+test22 = do
+  orig <- getContents
 
   let result = happyParser $ alexScanTokens orig
   case result of
@@ -25,18 +35,19 @@ someFunc = do
         putStrLn "true"
       else
         putStrLn "false, failed printing"
-      -- putStrLn cleanProgram
-      -- putStrLn cleanOriginal
-      -- print $ "RESULT: " ++ show (cleanProgram == cleanOriginal)
       -- print $ finddiff 0 (zip cleanOriginal cleanProgram)
-      -- putStrLn $ prettyPrint program
-
-      -- print program
 
 
 removeWhitespace = filter (\c -> c `notElem` [' ', '\n'])
 
-
 -- Debugging function
 finddiff i ((a,b):xs) = if a /= b then i else finddiff (i+1) xs
 finddiff i [] = i
+
+
+test23 :: IO () 
+test23 = do 
+  res <- testing 
+  case res of
+    Right p -> print p
+    Left err -> print err

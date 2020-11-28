@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds -fno-warn-missing-signatures #-}
 {-# LANGUAGE CPP #-}
-{-# LINE 1 "src/Tokens.x" #-}
+{-# LINE 1 "src/Lex.x" #-}
 
-module Tokens (
+module Lex (
     alexScanTokens
   , Token (..)
   , TokenType (..)
@@ -6794,7 +6794,7 @@ alex_actions = array (0 :: Int, 58)
   , (0,alex_action_31)
   ]
 
-{-# LINE 56 "src/Tokens.x" #-}
+{-# LINE 56 "src/Lex.x" #-}
 
 -- Each action has String -> Token
 

@@ -1,16 +1,10 @@
 {-# OPTIONS_GHC -w #-}
 module HappyParser (
-  Program (..)
-  , Decl (..)
-  , Variable (..)
-  , Stmnt (..)
-  , Type (..)
-  , Expr (..)
-  , Id (..)
-  , E (..)
+  E (..)
   , happyParser
   ) where
-import Tokens
+import Lex
+import AST
 import qualified Data.Array as Happy_Data_Array
 import qualified Data.Bits as Bits
 import Control.Applicative(Applicative(..))
@@ -1166,55 +1160,6 @@ parseError :: [Token] -> E a
 parseError [] = Error $ "Parse error, unexpected EOF" 
 parseError (Token t p:xs) = 
   Error $ "Parse error, unexpected " ++ show t ++ " at " ++ printAlexPosn p ++ "\n" ++ (show $ take 10 xs)
-
-type Program = [Decl]
-
-data Decl 
-  = FunctionWReturn Type Id [Variable] [Stmnt]
-  | VoidFunction Id [Variable] [Stmnt]
-  deriving Show
-
-data Variable = Variable Type Id
-  deriving Show
-
-data Stmnt 
-  = ReturnVoid      AlexPosn
-  | Return          AlexPosn Expr
-  | Expr            Expr
-  | If              AlexPosn Expr Stmnt
-  | IfElse          AlexPosn AlexPosn Expr Stmnt Stmnt
-  | While           AlexPosn Expr Stmnt
-  | StmntList       [Stmnt]
-  | VariableDecl    Variable
-  deriving Show
-
-data Type = IntType AlexPosn | BoolType AlexPosn deriving Show
-
-data Expr 
-  = Plus        AlexPosn Expr Expr
-  | Minus       AlexPosn Expr Expr
-  | Times       AlexPosn Expr Expr
-  | Div         AlexPosn Expr Expr
-  | Equal       AlexPosn Expr Expr
-  | NEqual      AlexPosn Expr Expr
-  | LessThan    AlexPosn Expr Expr
-  | GreaterThan AlexPosn Expr Expr
-  | LEQ         AlexPosn Expr Expr
-  | GEQ         AlexPosn Expr Expr
-  | Or          AlexPosn Expr Expr
-  | And         AlexPosn Expr Expr
-  | Not         AlexPosn Expr
-  | Neg         AlexPosn Expr
-
-  | Asn         AlexPosn Id Expr
-  | Int         AlexPosn Int 
-  | Var         Id
-  | Boolean     AlexPosn Bool
-  | Call        Id [Expr]
-  deriving Show
-
-data Id = Id AlexPosn String
-  deriving Show
 {-# LINE 1 "templates/GenericTemplate.hs" #-}
 -- $Id: GenericTemplate.hs,v 1.26 2005/01/14 14:47:22 simonmar Exp $
 

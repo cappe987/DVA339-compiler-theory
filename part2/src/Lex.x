@@ -1,5 +1,5 @@
 {
-module Tokens (
+module Lex (
     alexScanTokens
   , Token (..)
   , TokenType (..)
