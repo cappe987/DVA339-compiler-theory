@@ -1,7 +1,8 @@
 module Interpreter where
 
-import Control.Monad.State as St
-import Control.Monad.Trans.Except as Ex
+import Control.Monad.Except
+import Control.Monad.RWS
+import Data.Map
 
 -- import HappyParser
 import AST
@@ -24,36 +25,33 @@ isBool _         = False
 
 toBool (VBool b) = b
 
--- Monad transformer experimentation for lab 2.3
 
-newtype Stack = Stack { msg :: String}
+type Stack = [Map String Value]
 
--- type InterpreterState = StateT Stack IO
-
--- type ExprInterpreter = ExceptT String (StateT Stack IO)
-type ExprInterpreter = ExceptT String (StateT Stack IO)
+type ExprInterpreter = ExceptT String (RWS Program String Stack)
 
 -- Left is not bad in this case. It just means the return value.
 -- The state is not required back from a function call
-type FunInterpreter = ExceptT Value ExprInterpreter
+-- This is used to return early from a function
+type FunInterpreter = ExceptT (ExprInterpreter Value) ExprInterpreter
 
 -- unwrapAll :: ExprInterpreter a -> a
 -- unwrapAll :: FunInterpreter a -> Either e a
-unwrapAll = runExceptT 
+-- unwrapAll = runExceptT 
 
-returnValue :: Value -> FunInterpreter Value
-returnValue = throwE 
+returnValue :: ExprInterpreter Value -> FunInterpreter Value
+returnValue = throwError 
 
 exprError :: String -> ExprInterpreter a
-exprError s = throwE ("INTERPRETATION ERROR: " ++ s) 
+exprError = throwError 
 
 -- Print is a regular function call, thus an Expr and should be treated as such
 printString :: String -> ExprInterpreter ()
-printString = lift . lift . putStrLn
+printString s = tell $ s ++ "\n"
 
 
-evalStmnt :: Stmnt -> FunInterpreter Value
-evalStmnt (ReturnVoid _)= returnValue VVoid
+-- evalStmnt :: Stmnt -> FunInterpreter Value
+-- evalStmnt (ReturnVoid _)= returnValue VVoid
 
 
 evalNumericOperation :: (Int -> Int -> Int) -> Expr -> Expr -> ExprInterpreter Value
@@ -136,30 +134,38 @@ evalExpr (Call id es) = callFunction id es
 
 callFunction :: Id -> [Expr] -> ExprInterpreter Value
 -- callFunction id es = undefined
-callFunction id es = do
+callFunction (Id p name) es = do
   -- undefined
   values <- mapM evalExpr es -- Evaluate function arguments
-  res <- runExceptT $ runExceptT $ lift (evalFunction values)
+  let stackTrace = withExceptT (\s -> "  in function \'" ++ name ++ "\' at " ++ printAlexPosn p ++ "\n" ++ s) -- Adds stacktrace in case it fails inside function
+  res <- stackTrace $ runExceptT (evalFunction values)
 
   case res of
-    Right p -> case p of 
-      -- Right val -> return val
-      Right val -> 
-        -- When could this case happen? Don't quite understand. 
-        -- Good error in case it happens.
-        error $ "Function return error: " ++ (\(Id _ n) -> n) id ++ " " ++ show val
-          ++ " Args: " ++ show values
-      Left err -> throwE err -- Error occured in function
-    Left val -> return val -- Function returned successfully
+    Right _ -> 
+      stackTrace $ return VVoid
+    Left val -> stackTrace val
 
 
 evalFunction :: [Value] -> FunInterpreter Value
 evalFunction xs = do
   lift $ printString "Evaling function"
-  returnValue (VInt 5)
-  -- lift $ throwE "Error"
-  
+  -- returnValue (VInt 6)
+  lift $ printString "HI"
 
+  if Prelude.null xs then 
+    -- lift $ throwError "TestErr"
+    returnValue $ evalExpr (Plus testPos (Boolean testPos True) (Int testPos 8))
+  else 
+    lift $ callFunction (Id testPos "test2") []
+    -- lift $ exprError "Err" 
+
+    -- returnValue $ evalExpr (Plus testPos (Boolean testPos True) (Int testPos 8))
+  -- lift $ throwError "Error"
+  -- lift $ evalExpr (Int testPos 5)
+
+
+    -- return VVoid -- Always return void unless already returned.
+  
 
 
 
@@ -170,12 +176,13 @@ evalFunction xs = do
 -- interpretExpr :: ExceptT String IO Int
 interpretExpr :: ExprInterpreter ()
 interpretExpr = do 
-  state <- St.get
+  -- modify (\s -> Stack (msg s ++ " WOrld"))
+  state <- get
+  code <- ask
 
-  lift $ lift $ putStrLn (msg state)
-  St.put $ Stack (msg state ++ " world")
-  -- return ()
-  -- throwE "Err"
+
+  printString "Hello World"
+  return ()
 
 
 
@@ -184,18 +191,20 @@ interpretTest :: ExprInterpreter ()
 interpretTest = do
   interpretExpr
   interpretExpr
-  throwE "Error"
+  exprError "Testerror"
   interpretExpr
 
 
 
 -- testing :: Either String Value
 testing = 
-  let initState = Stack "Hello"
-  --     call = callFunction (Id testPos "test") [Int testPos 5]
-  --     res = runExceptT call
-  -- -- in evalStateT (runExceptT interpretTest) initState
-  -- in evalStateT res initState 
-    
+  let initState = [singleton "x" (VInt 5)] :: Stack
+      functions = [] :: Program
       tree = Or testPos (Boolean testPos True) (Boolean testPos False)
-  in evalStateT (runExceptT $ evalExpr tree) initState
+      call = callFunction (Id testPos "test") [Int testPos 5]
+      res = runExceptT call
+  -- in evalStateT (runExceptT interpretTest) initState
+  in evalRWS res functions initState 
+    
+  -- in evalRWST (runExceptT $ evalExpr tree) functions initState
+  -- in evalRWS (runExceptT interpretTest) functions initState

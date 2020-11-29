@@ -46,8 +46,9 @@ finddiff i [] = i
 
 
 test23 :: IO () 
-test23 = do 
-  res <- testing 
+test23 = do
+  let (res, output) = testing 
+  putStr output
   case res of
     Right p -> print p
-    Left err -> print err
+    Left err -> putStrLn $ "INTERPRETATION ERROR: \n" ++ err
