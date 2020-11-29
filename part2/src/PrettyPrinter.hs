@@ -119,6 +119,7 @@ showExpr binOp prevPrec opposite =
 showType :: Type -> Doc
 showType (IntType  _) = text "int"
 showType (BoolType _) = text "bool"
+showType (VoidType _) = text "void"
 
 showId :: Id -> Doc
 showId (Id _ name) = text name
@@ -178,10 +179,10 @@ showFunction id variables stmnts =
     <> text "}"
     <> line
 
-showDecl :: Decl -> Doc
-showDecl (VoidFunction id variables stmnts) = 
-  text "void" <> showFunction id variables stmnts
-showDecl (FunctionWReturn funtype id variables stmnts) = 
+showDecl :: Function -> Doc
+-- showDecl (VoidFunction id variables stmnts) = 
+  -- text "void" <> showFunction id variables stmnts
+showDecl (Function funtype id variables stmnts) = 
   showType funtype <> showFunction id variables stmnts
 
 

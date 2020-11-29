@@ -3,6 +3,7 @@ module Lib
     ) where
 
 import Lex
+import AST
 import HappyParser
 import PrettyPrinter
 import Interpreter
@@ -47,8 +48,14 @@ finddiff i [] = i
 
 test23 :: IO () 
 test23 = do
-  let (res, output) = testing 
+  input <- readFile "src/test.c"
+  
+  -- let (res, output) = testing 
+  let program = case happyParser $ alexScanTokens input of Ok a -> a; Error err -> error err
+      (res, output) = runMain program
+
+  print (program :: [Function])
   putStr output
   case res of
-    Right p -> print p
+    Right p -> return () -- print p
     Left err -> putStrLn $ "INTERPRETATION ERROR: \n" ++ err

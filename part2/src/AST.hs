@@ -1,6 +1,6 @@
 module AST (
   Program (..)
-  , Decl (..)
+  , Function (..)
   , Variable (..)
   , Stmnt (..)
   , Type (..)
@@ -13,11 +13,9 @@ module AST (
 
 import Lex
 
-type Program = [Decl]
+type Program = [Function]
 
-data Decl 
-  = FunctionWReturn Type Id [Variable] [Stmnt]
-  | VoidFunction Id [Variable] [Stmnt]
+data Function = Function Type Id [Variable] [Stmnt]
   deriving Show
 
 
@@ -58,7 +56,8 @@ data Expr
 data Variable = Variable Type Id
   deriving Show
   
-data Type = IntType AlexPosn | BoolType AlexPosn deriving Show
+data Type = IntType AlexPosn | BoolType AlexPosn | VoidType AlexPosn
+  deriving Show
 
 data Id = Id AlexPosn String
   deriving Show
