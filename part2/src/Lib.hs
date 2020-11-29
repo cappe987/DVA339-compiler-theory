@@ -54,7 +54,7 @@ test23 = do
   let program = case happyParser $ alexScanTokens input of Ok a -> a; Error err -> error err
       (res, output) = runMain program
 
-  print (program :: [Function])
+  -- print (program :: [Function])
   putStr output
   case res of
     Right p -> return () -- print p

@@ -96,7 +96,7 @@ type ExprInterpreter = ExceptT String (RWS Program String Stack)
 type FunInterpreter = ExceptT (ExprInterpreter Value) ExprInterpreter
 
 -- Used to trigger a `return` statement inside a function
-returnValue :: ExprInterpreter Value -> FunInterpreter Value
+returnValue :: ExprInterpreter Value -> FunInterpreter a
 returnValue = throwError 
 
 -- Actual type errors happen mainly on expression level. 
@@ -220,7 +220,8 @@ callFunction :: Id -> [Expr] -> ExprInterpreter Value
 callFunction (Id _ "print") es = printArgs es
 callFunction (Id p name) es = do
   -- -------------------- THIS FUNCTION IS NOT COMPLETE ------------------------------
-  program <- ask
+  program <- ask  
+
   (Function t _ params stmnts) <- maybe (undefFunError name p) return (tryGetFunction name program)
 
   paramVals <-  if length es /= length params then 
@@ -233,13 +234,15 @@ callFunction (Id p name) es = do
   put [newstate]
 
   res <- addStackTrace name p $ runExceptT (evalFunction name (toType t) stmnts)
-
+  
   put prevState
 
   case res of
     Right _ -> 
       addStackTrace name p $ return VVoid
-    Left val -> addStackTrace name p val
+    Left val -> do 
+      v <- val
+      addStackTrace name p val
       
 
 
@@ -255,7 +258,7 @@ evalFunction name expectedReturnType stmnts = do
   -- lift $ printString $ show (tryGetVar "x" state)
   -- returnValue $ evalExpr (Plus testPos (Int testPos 5) (Int testPos 8))
 
-  foldM_ (\_ a -> evalStmnt a) () stmnts
+  foldM_ (\_ a -> evalStmnt expectedReturnType a) () stmnts
 
   if VVoid `isType` expectedReturnType then
     returnValue (return VVoid)
@@ -264,47 +267,74 @@ evalFunction name expectedReturnType stmnts = do
 
   -- return VVoid -- Always return void unless already returned.
   
+evalIfElse :: AlexPosn -> Expr -> FunInterpreter () -> FunInterpreter () -> FunInterpreter ()
+evalIfElse p e s1 s2 = do
+  v <- lift $ evalExpr e
+  if v `isType` DTBool && toBool v then 
+    s1 -- If true
+  else if v `isType` DTBool then
+    s2
+  else 
+    lift $ throwError $ "Expected bool in condition to if-statement at " ++ printAlexPosn p ++ ". Got " ++ show (valueToType v)
 
-evalStmnt :: Stmnt -> FunInterpreter ()
-evalStmnt (Expr e) = do 
+evalStmnt :: DataType -> Stmnt -> FunInterpreter ()
+evalStmnt dt (Expr e) = do 
   lift $ evalExpr e
   return ()
-evalStmnt (VariableDecl (Variable t (Id _ name))) = 
+evalStmnt dt (VariableDecl (Variable t (Id _ name))) = 
   modify (varDeclare name (toType t))
+evalStmnt dt (If p e stmnt) = evalIfElse p e (evalStmnt dt stmnt) (return ())
+evalStmnt dt (IfElse p1 _ e s1 s2) = evalIfElse p1 e (evalStmnt dt s1) (evalStmnt dt s2)
+evalStmnt DTVoid (ReturnVoid _) = returnValue (return VVoid)
+evalStmnt dt     (ReturnVoid p) = lift $ throwError $ "Expected return of type " ++ show dt ++ ", but got void at " ++ printAlexPosn p ++ "."
+
+evalStmnt dt (Return   p e) = do 
+  v <- lift $ evalExpr e
+  if v `isType` dt then
+    returnValue (return v)
+  else
+    lift $ throwError $ "Expected return of type " ++ show dt ++ ", but got " ++ show (valueToType v) ++ " at " ++ printAlexPosn p ++ "."
+
+evalStmnt dt (While p e s) = undefined
+evalStmnt dt (StmntList ss) = undefined
+  
 
 
 -- interpret :: ExprInterpreter a -> (a -> ExprInterpreter a) -> ExprInterpreter a
 -- interpret = (>>=)
 
 -- interpretExpr :: ExceptT String IO Int
-interpretExpr :: ExprInterpreter ()
-interpretExpr = do 
-  -- modify (\s -> Stack (msg s ++ " WOrld"))
-  state <- get
-  code <- ask
+-- interpretExpr :: ExprInterpreter ()
+-- interpretExpr = do 
+--   -- modify (\s -> Stack (msg s ++ " WOrld"))
+--   state <- get
+--   code <- ask
 
 
-  printString "Hello World"
-  return ()
+--   printString "Hello World"
+--   return ()
 
 
 
--- interpretTest :: IO ()
-interpretTest :: ExprInterpreter ()
-interpretTest = do
-  interpretExpr
-  interpretExpr
-  exprError "Testerror"
-  interpretExpr
+-- -- interpretTest :: IO ()
+-- interpretTest :: ExprInterpreter ()
+-- interpretTest = do
+--   interpretExpr
+--   interpretExpr
+--   exprError "Testerror"
+--   interpretExpr
 
 
 
 runMain :: Program -> (Either String Value, String)
 runMain program = do 
   let initState = [Map.empty]
-      (Function _ id vars stmnts)  = head program
+      mainFunc  = find (\(Function _ (Id _ name) _ _) -> name == "main") program
 
-  evalRWS (runExceptT $ callFunction id []) program initState
+  case mainFunc of 
+    Just (Function _ id _ _) -> 
+      evalRWS (runExceptT $ callFunction id []) program initState
+    Nothing -> (Left "  No main function found", "")
 
 
 
