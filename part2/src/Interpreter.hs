@@ -2,7 +2,10 @@ module Interpreter where
 
 import Control.Monad.Except
 import Control.Monad.RWS
-import Data.Map
+import qualified Data.Map as Map
+import Data.List
+import Data.Maybe
+-- import Prelude as P
 
 -- import HappyParser
 import AST
@@ -15,126 +18,151 @@ data Value = VInt Int | VBool Bool | VVoid
   deriving (Show)
 
 
-isInt (VInt _) = True
-isInt _        = False
+-- isInt (VInt _) = True
+-- isInt _        = False
 
 toInt (VInt i) = i
 
-isBool (VBool _) = True
-isBool _         = False
+-- isBool (VBool _) = True
+-- isBool _         = False
 
 toBool (VBool b) = b
 
+data DataType = DTInt | DTBool
 
-type Stack = [Map String Value]
+instance Show DataType where
+  show DTInt  = "int"
+  show DTBool = "bool"
 
-type ExprInterpreter = ExceptT String (RWS Program String Stack)
+toType :: Type -> DataType
+toType (IntType  _) = DTInt
+toType (BoolType _) = DTBool
+
+valueToType :: Value -> DataType
+valueToType (VInt  _) = DTInt
+valueToType (VBool _) = DTBool
+
+isType :: Value -> DataType -> Bool
+isType (VInt  _) DTInt  = True
+isType (VBool _) DTBool = True
+isType _ _ = False
+
+
+type Env = Map.Map String (DataType, Maybe Value)
+
+type Stack = [Env]
+
+varDeclare :: String -> DataType -> Stack -> Stack
+varDeclare name vartype (m:ms) = 
+  Map.insert name (vartype, Nothing) m : ms
+
+-- Might be needed depending on how double declarations are to be handled
+-- Shadowing was to be accepted. But what about two on the same level?
+varExistsInTopEnv :: String -> Stack -> Bool
+varExistsInTopEnv name (m:_) = 
+  name `Map.member` m
+
+tryGetVar :: String -> Stack -> Maybe (DataType, Maybe Value)
+tryGetVar name = 
+  fromMaybe Nothing . find isJust . map (Map.lookup name) 
+
+updateVar :: String -> Value -> Stack -> Stack
+updateVar name _ [] = error $ "Variable " ++ name ++ " does not exist"
+updateVar name value (m:ms) = 
+  if name `Map.member` m then
+    Map.adjust (\(dt, _) -> (dt, Just value)) name m : ms
+  else
+    m : updateVar name value ms
+  
+
+type ExprInterpreter = ExceptT String (RWS Program String Stack) 
 
 -- Left is not bad in this case. It just means the return value.
 -- The state is not required back from a function call
 -- This is used to return early from a function
 type FunInterpreter = ExceptT (ExprInterpreter Value) ExprInterpreter
 
--- unwrapAll :: ExprInterpreter a -> a
--- unwrapAll :: FunInterpreter a -> Either e a
--- unwrapAll = runExceptT 
-
+-- Used to trigger a `return` statement inside a function
 returnValue :: ExprInterpreter Value -> FunInterpreter Value
 returnValue = throwError 
 
+-- Actual type errors happen mainly on expression level. 
+-- Although arguments and return statements can also trigger type errors.
 exprError :: String -> ExprInterpreter a
 exprError = throwError 
 
 -- Print is a regular function call, thus an Expr and should be treated as such
-printString :: String -> ExprInterpreter ()
-printString s = tell $ s ++ "\n"
+printString :: String -> ExprInterpreter Value
+printString s = do 
+  tell $ s ++ "\n" 
+  return VVoid -- Print is void function
 
 
--- evalStmnt :: Stmnt -> FunInterpreter Value
--- evalStmnt (ReturnVoid _)= returnValue VVoid
+evalUnaryOp :: DataType -> (Value -> Value) -> Expr -> ExprInterpreter Value
+evalUnaryOp dt f e = do 
+  v <- evalExpr e
 
+  if v `isType` dt then
+    return (f v)
+  else
+    exprError $ "Type mismatch type at " ++ printAlexPosn (exprPos e) 
+      ++ ". Expected int, got " ++ show (valueToType v)
 
-evalNumericOperation :: (Int -> Int -> Int) -> Expr -> Expr -> ExprInterpreter Value
-evalNumericOperation f e1 e2 = do
+evalBinaryOp :: DataType -> DataType -> (Value -> Value -> Value) -> Expr -> Expr -> ExprInterpreter Value
+evalBinaryOp leftT rightT f e1 e2 = do 
   v1 <- evalExpr e1
   v2 <- evalExpr e2
 
-  if isInt v1 then 
-    if isInt v2 then
-      return $ VInt (f (toInt v1) (toInt v2))
+  if v1 `isType` leftT then 
+    if v2 `isType` rightT then
+      return (f v1 v2)
     else
-      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e2)
-        ++ ". Expected int, got " ++ show v2
+      exprError $ "Type mismatch type at " ++ printAlexPosn (exprPos e2)
+        ++ ". Expected int, got " ++ show (valueToType v2)
   else
-      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e1) 
-        ++ ". Expected int, got " ++ show v1
+      exprError $ "Type mismatch type at " ++ printAlexPosn (exprPos e1) 
+        ++ ". Expected int, got " ++ show (valueToType v1)
 
-evalBoolOperation :: (Bool -> Bool -> Bool) -> Expr -> Expr -> ExprInterpreter Value
-evalBoolOperation f e1 e2 = do
-  v1 <- evalExpr e1
-  v2 <- evalExpr e2
-
-  if isBool v1 then 
-    if isBool v2 then
-      return $ VBool (f (toBool v1) (toBool v2))
-    else
-      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e2)
-        ++ ". Expected bool, got " ++ show v2
-  else
-      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e1) 
-        ++ ". Expected bool, got " ++ show v1
-
-evalComparison :: (Int -> Int -> Bool) -> Expr -> Expr -> ExprInterpreter Value
-evalComparison f e1 e2 = do
-  v1 <- evalExpr e1
-  v2 <- evalExpr e2
-
-  if isInt v1 then 
-    if isInt v2 then
-      return $ VBool (f (toInt v1) (toInt v2))
-    else
-      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e2)
-        ++ ". Expected int, got " ++ show v2
-  else
-      exprError $ "Invalid type at " ++ printAlexPosn (exprPos e1) 
-        ++ ". Expected int, got " ++ show v1
+numericOp    f v1 v2 = VInt  $ toInt  v1 `f` toInt  v2
+booleanOp    f v1 v2 = VBool $ toBool v1 `f` toBool v2
+comparisonOp f v1 v2 = VBool $ toInt  v1 `f` toInt  v2
 
 evalExpr :: Expr -> ExprInterpreter Value
 evalExpr (Int       _ i) = return (VInt i)
 evalExpr (Boolean   _ b) = return (VBool b)
-evalExpr (Plus  _ e1 e2) = evalNumericOperation (+) e1 e2
-evalExpr (Minus _ e1 e2) = evalNumericOperation (-) e1 e2
-evalExpr (Times _ e1 e2) = evalNumericOperation (*) e1 e2
-evalExpr (And   _ e1 e2) = evalBoolOperation (&&) e1 e2
-evalExpr (Or    _ e1 e2) = evalBoolOperation (||) e1 e2
-evalExpr (LEQ   _ e1 e2) = evalComparison (<=) e1 e2
-evalExpr (GEQ   _ e1 e2) = evalComparison (>=) e1 e2
-evalExpr (LessThan    _ e1 e2) = evalComparison (<) e1 e2
-evalExpr (GreaterThan _ e1 e2) = evalComparison (>) e1 e2
+evalExpr (Plus  _ e1 e2) = evalBinaryOp DTInt  DTInt  (numericOp (+))  e1 e2
+evalExpr (Minus _ e1 e2) = evalBinaryOp DTInt  DTInt  (numericOp (-))  e1 e2
+evalExpr (Times _ e1 e2) = evalBinaryOp DTInt  DTInt  (numericOp (*))  e1 e2
+evalExpr (Div   _ e1 e2) = evalBinaryOp DTInt  DTInt  (numericOp div)  e1 e2
+evalExpr (And   _ e1 e2) = evalBinaryOp DTBool DTBool (booleanOp (&&)) e1 e2
+evalExpr (Or    _ e1 e2) = evalBinaryOp DTBool DTBool (booleanOp (||)) e1 e2
+evalExpr (LEQ   _ e1 e2) = evalBinaryOp DTInt  DTInt  (comparisonOp (<=)) e1 e2
+evalExpr (GEQ   _ e1 e2) = evalBinaryOp DTInt  DTInt  (comparisonOp (>=)) e1 e2
+evalExpr (LessThan    _ e1 e2) = evalBinaryOp  DTInt DTInt (comparisonOp (<)) e1 e2
+evalExpr (GreaterThan _ e1 e2) = evalBinaryOp  DTInt DTInt (comparisonOp (>)) e1 e2
 
-evalExpr (Neg   _ e) = do 
-  v <- evalExpr e
-  if isInt v then
-    return (VInt (-(toInt v)))
-  else
-    exprError $ "Invalid type at " ++ printAlexPosn (exprPos e) 
-      ++ ". Expected int, got " ++ show v
+evalExpr (Neg   _ e) = evalUnaryOp DTInt  (\v -> VInt (-(toInt v))) e
+evalExpr (Not   _ e) = evalUnaryOp DTBool (VBool . not . toBool)    e
 
-evalExpr (Not   _ e) = do
-  v <- evalExpr e
-  if isBool v then
-    return (VBool (not $ toBool v))
-  else
-    exprError $ "Invalid type at " ++ printAlexPosn (exprPos e) 
-      ++ ". Expected int, got " ++ show v
+evalExpr (Asn p1 (Id p2 name) e) = do 
+  state <- get
+  case tryGetVar name state of 
+    Just (dt, _) -> do 
+      res <- evalExpr e
+      if res `isType` dt then do
+        modify (updateVar name res)
+        return res
+      else
+        exprError $ "Type mismatch at " ++ printAlexPosn p1 ++ ". Expected " ++ show dt ++ " but got " ++ show (valueToType res) ++ "."
 
-evalExpr (Asn _ id e) = undefined
+    Nothing -> exprError $ "Use of undeclared variable \'" ++ name ++ "\' at " ++ printAlexPosn p2 ++ "."
+
 evalExpr (Var id    ) = undefined
 evalExpr (Call id es) = callFunction id es
 
 callFunction :: Id -> [Expr] -> ExprInterpreter Value
--- callFunction id es = undefined
 callFunction (Id p name) es = do
+  -- -------------------- THIS FUNCTION IS NOT COMPLETE ------------------------------
   -- undefined
   values <- mapM evalExpr es -- Evaluate function arguments
   let stackTrace = withExceptT (\s -> "  in function \'" ++ name ++ "\' at " ++ printAlexPosn p ++ "\n" ++ s) -- Adds stacktrace in case it fails inside function
@@ -148,15 +176,22 @@ callFunction (Id p name) es = do
 
 evalFunction :: [Value] -> FunInterpreter Value
 evalFunction xs = do
-  lift $ printString "Evaling function"
+  lift $ printString "Testing evalFunction"
   -- returnValue (VInt 6)
   lift $ printString "HI"
 
-  if Prelude.null xs then 
+  state <- get
+  lift $ printString $ show (tryGetVar "x" state)
+
+  lift $ evalExpr (Asn testPos (Id testPos "x") (Plus testPos (Int testPos 5) (Int testPos 8)))
+  
+  state <- get
+  lift $ printString $ show (tryGetVar "x" state)
+  -- if Prelude.null xs then 
     -- lift $ throwError "TestErr"
-    returnValue $ evalExpr (Plus testPos (Boolean testPos True) (Int testPos 8))
-  else 
-    lift $ callFunction (Id testPos "test2") []
+  returnValue $ evalExpr (Plus testPos (Int testPos 5) (Int testPos 8))
+  -- else 
+    -- lift $ callFunction (Id testPos "test2") []
     -- lift $ exprError "Err" 
 
     -- returnValue $ evalExpr (Plus testPos (Boolean testPos True) (Int testPos 8))
@@ -198,11 +233,14 @@ interpretTest = do
 
 -- testing :: Either String Value
 testing = 
-  let initState = [singleton "x" (VInt 5)] :: Stack
+  let initState = [Map.singleton "x" (DTInt, Just $ VInt 5)] :: Stack
+  -- let initState = [Map.empty] :: Stack
       functions = [] :: Program
       tree = Or testPos (Boolean testPos True) (Boolean testPos False)
-      call = callFunction (Id testPos "test") [Int testPos 5]
-      res = runExceptT call
+      test = callFunction (Id testPos "test") [Int testPos 5]
+      -- test = evalExpr (Asn testPos (Id testPos "x") (Plus testPos (Int testPos 5) (Int testPos 8)))
+
+      res = runExceptT test
   -- in evalStateT (runExceptT interpretTest) initState
   in evalRWS res functions initState 
     

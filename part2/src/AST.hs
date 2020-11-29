@@ -20,8 +20,6 @@ data Decl
   | VoidFunction Id [Variable] [Stmnt]
   deriving Show
 
-data Variable = Variable Type Id
-  deriving Show
 
 data Stmnt 
   = ReturnVoid      AlexPosn
@@ -33,8 +31,6 @@ data Stmnt
   | StmntList       [Stmnt]
   | VariableDecl    Variable
   deriving Show
-
-data Type = IntType AlexPosn | BoolType AlexPosn deriving Show
 
 data Expr 
   = Plus        AlexPosn Expr Expr
@@ -58,6 +54,11 @@ data Expr
   | Boolean     AlexPosn Bool
   | Call        Id [Expr]
   deriving Show
+
+data Variable = Variable Type Id
+  deriving Show
+  
+data Type = IntType AlexPosn | BoolType AlexPosn deriving Show
 
 data Id = Id AlexPosn String
   deriving Show
