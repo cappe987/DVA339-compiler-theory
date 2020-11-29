@@ -6,3 +6,5 @@ QUT.ShiftReduceParser.dll
 src/Testparser.y
 prettyprint.c
 test.c
+test_suite_23/
+Test23.exe

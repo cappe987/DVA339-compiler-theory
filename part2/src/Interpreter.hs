@@ -15,12 +15,12 @@ import Debug.Trace
 
 
 data Value = VInt Int | VBool Bool | VVoid
-  -- deriving (Show)
+  deriving (Eq)
 
 instance Show Value where
   show (VInt      i) = show i
-  show (VBool True ) = "true"
-  show (VBool False) = "false"
+  show (VBool True ) = "True"
+  show (VBool False) = "False"
   show VVoid         = "void"
 
 -- isInt (VInt _) = True
@@ -34,7 +34,7 @@ toInt (VInt i) = i
 toBool (VBool b) = b
 
 data DataType = DTInt | DTBool | DTVoid
--- | DTVoid
+  deriving Eq
 
 instance Show DataType where
   show DTInt  = "int"
@@ -122,6 +122,8 @@ evalExpr (And   _ e1 e2) = evalBinaryOp DTBool DTBool (booleanOp (&&)) e1 e2
 evalExpr (Or    _ e1 e2) = evalBinaryOp DTBool DTBool (booleanOp (||)) e1 e2
 evalExpr (LEQ   _ e1 e2) = evalBinaryOp DTInt  DTInt  (comparisonOp (<=)) e1 e2
 evalExpr (GEQ   _ e1 e2) = evalBinaryOp DTInt  DTInt  (comparisonOp (>=)) e1 e2
+evalExpr (Equal p e1 e2)  = evalEquality p (==) e1 e2
+evalExpr (NEqual p e1 e2) = evalEquality p (/=) e1 e2
 evalExpr (LessThan    _ e1 e2) = evalBinaryOp  DTInt DTInt (comparisonOp (<)) e1 e2
 evalExpr (GreaterThan _ e1 e2) = evalBinaryOp  DTInt DTInt (comparisonOp (>)) e1 e2
 
@@ -133,6 +135,14 @@ evalExpr (Var id    ) = retrieveValue id
 evalExpr (Call id es) = callFunction id es
 
 
+evalEquality :: AlexPosn -> (Value -> Value -> Bool) -> Expr -> Expr -> ExprInterpreter Value
+evalEquality p f e1 e2 = do 
+  v1 <- evalExpr e1
+  v2 <- evalExpr e2
+  if valueToType v2 == valueToType v2 then
+    return (VBool $ v1 `f` v2)
+  else
+    throwError $ "Type mismatch for operator at " ++ printAlexPosn p ++ ". Left: " ++ show (valueToType v1) ++ ". Right: " ++ show (valueToType v2) ++ "."
 
 evalUnaryOp :: DataType -> (Value -> Value) -> Expr -> ExprInterpreter Value
 evalUnaryOp dt f e = do 
@@ -240,9 +250,7 @@ callFunction (Id p name) es = do
   case res of
     Right _ -> 
       addStackTrace name p $ return VVoid
-    Left val -> do 
-      v <- val
-      addStackTrace name p val
+    Left val -> addStackTrace name p val
       
 
 
@@ -277,6 +285,18 @@ evalIfElse p e s1 s2 = do
   else 
     lift $ throwError $ "Expected bool in condition to if-statement at " ++ printAlexPosn p ++ ". Got " ++ show (valueToType v)
 
+repeatWhile :: DataType -> Expr -> Stmnt -> FunInterpreter () 
+repeatWhile dt e s = do 
+  v <- lift $ evalExpr e
+  when (toBool v) $ do 
+                    evalStmnt dt s
+                    repeatWhile dt e s
+  -- if toBool v then  do
+  --   evalStmnt dt s
+  --   repeatWhile dt e s
+  -- else 
+  --   return ()
+
 evalStmnt :: DataType -> Stmnt -> FunInterpreter ()
 evalStmnt dt (Expr e) = do 
   lift $ evalExpr e
@@ -295,9 +315,21 @@ evalStmnt dt (Return   p e) = do
   else
     lift $ throwError $ "Expected return of type " ++ show dt ++ ", but got " ++ show (valueToType v) ++ " at " ++ printAlexPosn p ++ "."
 
-evalStmnt dt (While p e s) = undefined
-evalStmnt dt (StmntList ss) = undefined
-  
+evalStmnt dt (While p e s) = do 
+  v <- lift $ evalExpr e
+  if v `isType` DTBool && toBool v then do
+    evalStmnt dt s
+    repeatWhile dt e s
+  else if v `isType` DTBool then
+    return () 
+  else
+    lift $ throwError $ "Expected bool in condition to while-statement at " ++ printAlexPosn p ++ ". Got " ++ show (valueToType v)
+    
+evalStmnt dt (StmntList ss) = do 
+  modify (Map.empty :)
+  foldM_ (\_ a -> evalStmnt dt a) () ss
+  modify tail
+
 
 
 -- interpret :: ExprInterpreter a -> (a -> ExprInterpreter a) -> ExprInterpreter a

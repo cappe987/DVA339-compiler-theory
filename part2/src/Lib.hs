@@ -46,8 +46,26 @@ finddiff i ((a,b):xs) = if a /= b then i else finddiff (i+1) xs
 finddiff i [] = i
 
 
-test23 :: IO () 
-test23 = do
+test23 :: IO ()
+test23 = do 
+  input <- getContents 
+  
+  -- Drop "expected output" comments. Comments were not in the language specification
+  let code = unlines $ dropWhile (\s -> not (null s) && head s == '/') $ lines input
+
+  let (res, output) = 
+        case happyParser $ alexScanTokens code of 
+          Ok program -> runMain program
+          Error err  -> error err
+
+  putStr output -- Print the accumulated output
+  case res of
+    Right _ -> return () 
+    Left err -> putStrLn $ "INTERPRETATION ERROR: \n" ++ err
+
+
+test23_file :: IO () 
+test23_file = do
   input <- readFile "src/test.c"
   
   -- let (res, output) = testing 
