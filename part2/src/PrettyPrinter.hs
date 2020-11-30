@@ -1,10 +1,6 @@
 module PrettyPrinter where
 
-
--- import Lex
 import AST
--- import Debug.Trace
-
 
 data  Doc 
   = Nil
@@ -180,8 +176,6 @@ showFunction id variables stmnts =
     <> line
 
 showDecl :: Function -> Doc
--- showDecl (VoidFunction id variables stmnts) = 
-  -- text "void" <> showFunction id variables stmnts
 showDecl (Function funtype id variables stmnts) = 
   showType funtype <> showFunction id variables stmnts
 
