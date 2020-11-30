@@ -28,6 +28,8 @@ source-repository head
 library
   exposed-modules:
       Interpreter
+      InterpreterBase
+      InterpreterErrors
       HappyParser
       AST
       Lex
