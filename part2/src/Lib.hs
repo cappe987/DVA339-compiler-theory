@@ -9,13 +9,15 @@ import PrettyPrinter
 import Interpreter
 
 someFunc :: IO ()
-someFunc = test23
+someFunc = test23_file
 
+parse :: String -> E Program
+parse = happyParser . alexScanTokens
 
 test21 :: IO ()
 test21 = do 
   orig <- getContents
-  case happyParser $ alexScanTokens orig of 
+  case parse orig of 
     Error _ -> putStrLn "false"
     Ok    _ -> putStrLn "true"
 
@@ -23,8 +25,7 @@ test22 :: IO ()
 test22 = do
   orig <- getContents
 
-  let result = happyParser $ alexScanTokens orig
-  case result of
+  case parse orig of
     Error _ -> putStrLn "false, failed parsing"
     Ok    program -> do
       -- putStrLn "true"
@@ -54,7 +55,7 @@ test23 = do
   let code = unlines $ dropWhile (\s -> not (null s) && head s == '/') $ lines input
 
   let (res, output) = 
-        case happyParser $ alexScanTokens code of 
+        case parse code of 
           Ok program -> runMain program
           Error err  -> error err
 
@@ -69,7 +70,7 @@ test23_file = do
   input <- readFile "src/test.c"
   
   -- let (res, output) = testing 
-  let program = case happyParser $ alexScanTokens input of Ok a -> a; Error err -> error err
+  let program = case parse input of Ok a -> a; Error err -> error err
       (res, output) = runMain program
 
   -- print (program :: [Function])
