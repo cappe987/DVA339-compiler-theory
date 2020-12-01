@@ -18,8 +18,8 @@ evalExpr (Plus  p e1 e2) = evalBinaryOp p DTInt  DTInt  (numericOp (+))  e1 e2
 evalExpr (Minus p e1 e2) = evalBinaryOp p DTInt  DTInt  (numericOp (-))  e1 e2
 evalExpr (Times p e1 e2) = evalBinaryOp p DTInt  DTInt  (numericOp (*))  e1 e2
 evalExpr (Div   p e1 e2) = evalBinaryOp p DTInt  DTInt  (numericOp div)  e1 e2
-evalExpr (And   p e1 e2) = evalBinaryOp p DTBool DTBool (booleanOp (&&)) e1 e2
-evalExpr (Or    p e1 e2) = evalBinaryOp p DTBool DTBool (booleanOp (||)) e1 e2
+evalExpr (And   p e1 e2) = evalBoolExpr p e1 e2 (not . toBool)
+evalExpr (Or    p e1 e2) = evalBoolExpr p e1 e2 toBool
 evalExpr (LEQ   p e1 e2) = evalBinaryOp p DTInt  DTInt  (comparisonOp (<=)) e1 e2
 evalExpr (GEQ   p e1 e2) = evalBinaryOp p DTInt  DTInt  (comparisonOp (>=)) e1 e2
 evalExpr (Equal p e1 e2)  = evalEquality p (==) e1 e2
@@ -34,6 +34,22 @@ evalExpr (Asn p1 (Id p2 name) e) = assignValue p1 (Id p2 name) e
 evalExpr (Var id    ) = retrieveValue id
 evalExpr (Call id es) = callFunction id es
 
+
+-- `f` is different depending on if it's AND or OR operator.
+-- For AND it returns early if it's false. For OR it returns early if it's true.
+evalBoolExpr :: AlexPosn -> Expr -> Expr -> (Value -> Bool) -> ExprInterpreter Value
+evalBoolExpr p e1 e2 f = do 
+  v1 <- evalExpr e1
+  if v1 `isType` DTBool && f v1 then
+    return (VBool $ toBool v1)
+  else if v1 `isType` DTBool then do 
+    v2 <- evalExpr e2
+    if v2 `isType` DTBool then
+      return (VBool $ toBool v2)
+    else
+      binaryOpTypeError p "right" DTBool (valueToType v2) 
+  else
+    binaryOpTypeError p "left" DTBool (valueToType v1)
 
 -- Equality is possible between both bools and integers
 evalEquality :: AlexPosn -> (Value -> Value -> Bool) -> Expr -> Expr -> ExprInterpreter Value
@@ -150,7 +166,7 @@ callFunction (Id p name) es = do
 -- ------------- Evaluation of functions and statements --------------
 
 -- Make this throw error for when return value does not match function type.
-evalFunction :: String -> DataType -> [Stmnt] -> FunInterpreter Value
+evalFunction :: String -> DataType -> [Stmnt] -> FunInterpreter ()
 evalFunction name expectedReturnType stmnts = do
   -- Eval all statements in body
   foldM_ (\_ a -> evalStmnt expectedReturnType a) () stmnts

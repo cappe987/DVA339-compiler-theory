@@ -2,6 +2,15 @@
 
 Generated lexer and parser using the libraries Alex and Happy.
 
+
+## Desugaring? (Lecture 6)
+Do a pre-pass to evaluator to rename variables to remove shadowing.
+Keep track of display name for error messages.
+I realize I've already similar to the renaming method in my interpreter, but without actually renaming anything.
+
+Replace the types properly when desugaring? Not sure if this would give any advantage.
+
+
 # Grammar of the language
 ```
 Program ::= Decl*
