@@ -67,7 +67,7 @@ Program
   | Decl Program { $1 : $2 }
 
 Decl 
-  : Type     var '(' FormalList ')' '{' Stmnts '}'  { Function $1 ((uncurry Id) $2) $4 $7 } 
+  : FuncType     var '(' FormalList ')' '{' Stmnts '}'  { Function $1 ((uncurry Id) $2) $4 $7 } 
 
 FormalList 
   : {- empty -} { [] }
@@ -78,10 +78,14 @@ FormalListMore
   : {- empty -} { [] }
   | ',' Type var FormalListMore   {Variable $2 ((uncurry Id) $3) : $4} 
 
-Type 
+FuncType 
   : intType  { IntType $1 }
   | boolType { BoolType $1 }
   | voidType { VoidType $1 }
+
+Type 
+  : intType  { IntType $1 }
+  | boolType { BoolType $1 }
 
 -- Zero or more statements 
 Stmnts :: { [Stmnt] }

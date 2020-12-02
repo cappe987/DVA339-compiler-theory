@@ -9,7 +9,7 @@ import PrettyPrinter
 import Interpreter
 
 someFunc :: IO ()
-someFunc = test23_file
+someFunc = test23
 
 parse :: String -> E Program
 parse = happyParser . alexScanTokens
