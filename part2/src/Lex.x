@@ -6,6 +6,7 @@ module Lex (
   , AlexPosn
   , printAlexPosn
   , testPos
+  , getPos
   ) where 
 }
 
@@ -99,6 +100,10 @@ data Token = Token TokenType AlexPosn
 printAlexPosn :: AlexPosn -> String
 printAlexPosn (AlexPn _ line col) = 
   show line ++ ":" ++ show col
+
+
+getPos :: AlexPosn -> (Int, Int)
+getPos (AlexPn _ line col) = (line, col)
 
 testPos :: AlexPosn
 testPos = AlexPn 0 0 0

@@ -8,3 +8,5 @@ prettyprint.c
 test.c
 test_suite_23/
 Test23.exe
+test_suite_24/
+Test24.exe

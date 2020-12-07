@@ -3,6 +3,7 @@ module InterpreterErrors where
 import Lex
 import AST
 import InterpreterBase
+import Datatypes
 import Control.Monad.Except
 
 undefFunError :: String -> AlexPosn -> ExprInterpreter Function

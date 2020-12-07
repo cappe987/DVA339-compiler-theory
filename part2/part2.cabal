@@ -30,6 +30,8 @@ library
       Interpreter
       InterpreterBase
       InterpreterErrors
+      Datatypes
+      Typechecker
       HappyParser
       AST
       Lex

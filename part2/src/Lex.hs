@@ -9,6 +9,7 @@ module Lex (
   , AlexPosn
   , printAlexPosn
   , testPos
+  , getPos
   ) where 
 
 #if __GLASGOW_HASKELL__ >= 603
@@ -6794,7 +6795,7 @@ alex_actions = array (0 :: Int, 58)
   , (0,alex_action_31)
   ]
 
-{-# LINE 56 "src/Lex.x" #-}
+{-# LINE 57 "src/Lex.x" #-}
 
 -- Each action has String -> Token
 
@@ -6841,6 +6842,10 @@ data Token = Token TokenType AlexPosn
 printAlexPosn :: AlexPosn -> String
 printAlexPosn (AlexPn _ line col) = 
   show line ++ ":" ++ show col
+
+
+getPos :: AlexPosn -> (Int, Int)
+getPos (AlexPn _ line col) = (line, col)
 
 testPos :: AlexPosn
 testPos = AlexPn 0 0 0

@@ -9,6 +9,7 @@ import AST
 import Lex
 import InterpreterBase
 import InterpreterErrors
+import Datatypes
 
 
 evalExpr :: Expr -> ExprInterpreter Value

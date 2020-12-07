@@ -67,6 +67,7 @@ data Id = Id AlexPosn String
 -- While writing this I regret this decision
 -- but I am now too lazy to fix it.
 
+-- Only used for binary operators
 getExprs (Or          _ e1 e2) = (e1, e2)  
 getExprs (And         _ e1 e2) = (e1, e2) 
 getExprs (Equal       _ e1 e2) = (e1, e2) 
