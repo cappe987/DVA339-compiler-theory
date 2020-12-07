@@ -5,6 +5,7 @@ import Control.Monad.Except
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.List
+import Data.Bool
 
 import AST
 -- import InterpreterBase
@@ -112,12 +113,62 @@ checkExpr (Call (Id p name) es)  = do
         return (typeToDataType rettype)
 
 
-checkExpr (Equal  _ e1 e2) = undefined
-checkExpr (NEqual _ e1 e2) = undefined
+checkExpr (Equal  p e1 e2) = checkEquality p e1 e2
+  
+checkExpr (NEqual p e1 e2) = checkEquality p e1 e2
 
+checkEquality p e1 e2 = do
+  t1 <- checkExpr e1
+  if t1 == DTVoid then
+    typeError (exprPos e1)
+  else do 
+    t2 <- checkExpr e2
+    if t2 == DTVoid then
+      typeError (exprPos e2)
+    else if t1 /= t2 then
+      typeError p
+    else
+      return DTBool
 
 checkStatement :: DataType -> Stmnt -> Checker ()
-checkStatement = undefined
+checkStatement rettype (ReturnVoid p) = 
+  if rettype == DTVoid then return () else typeError p
+checkStatement rettype (Return p e) = 
+  checkExpr e >>= \t -> if rettype == t then return () else typeError p
+checkStatement _       (Expr e  ) = 
+  void $ checkExpr e 
+checkStatement rettype (IfElse _ _ e s1 s2) = do 
+  t <- checkExpr e
+  if t == DTBool then do 
+    checkStatement rettype (StmntList [s1]) -- Creates a block in case there wasn't one.
+    checkStatement rettype (StmntList [s2]) -- To handle shadowing proplerly
+  else
+    typeError (exprPos e) -- Condition not bool
+
+checkStatement rettype (If p e s) = 
+  checkExpr e 
+  >>= bool (typeError (exprPos e)) (checkStatement rettype (StmntList [s])) . (== DTBool)
+checkStatement rettype (While _ e s) = 
+  checkExpr e 
+  >>= bool (typeError (exprPos e)) (checkStatement rettype (StmntList [s])) . (== DTBool)
+
+checkStatement _ (VariableDecl (Variable t (Id p name))) = do 
+  (Env stack fs) <- get
+  if name `Map.member` head stack then
+    typeError p -- Variable already exists in current top scope.
+  else do
+    let newhead = Map.insert name (typeToDataType t) $ head stack
+    put (Env (newhead:tail stack) fs)
+
+checkStatement rettype (StmntList ss) = do 
+  modify (\(Env st fs) -> Env (Map.empty:st) fs)
+  foldr ((>>) . checkStatement rettype) (return ()) ss
+  modify (\(Env st fs) -> Env (tail st) fs)
+
+
+
+
+-- Make sure that a non-void function has a return.
 
 checkFunction :: Function -> Checker a
 checkFunction (Function t (Id p s) vs stmnts) = undefined
