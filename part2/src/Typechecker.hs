@@ -8,9 +8,7 @@ import Data.List
 import Data.Bool
 
 import AST
--- import InterpreterBase
 import Datatypes
-import InterpreterErrors
 import Lex
 
 
@@ -18,22 +16,16 @@ data FunctionType = FunctionType DataType String [Variable]
 
 type Stack = [Map.Map String DataType]
 
-data Env = Env Stack [FunctionType]
+data Env = Env Stack Bool -- Bool indicates if a function has a return statement or not
 
-type Checker = ExceptT String (RWS Program () Env)
+type Checker = ExceptT (Int, Int) (RWS Program () Env)
 
 
 typeError :: AlexPosn -> Checker a
 typeError pos = 
-  throwError $ "fail " ++ show line ++ " " ++ show col
+  throwError (line, col)
   where (line,col) = getPos pos
 
-
--- To make so the error matches the test
--- addFail :: AlexPosn -> Checker a -> Checker a
--- addFail p = 
---   withExceptT (\s -> "fail " ++ show line ++ " " ++ show col ++ "\n" ++ s)
---   where (line, col) = getPos p
 
 
 getVarType :: String -> Stack -> Maybe DataType
@@ -48,8 +40,6 @@ hasType expr t = do
   else
     typeError (exprPos expr)
 
-    
-  -- let t' = getVarType 
 
 checkArgs :: [DataType] -> [Variable] -> Checker ()
 checkArgs [] [] = return ()
@@ -93,7 +83,7 @@ checkExpr (Asn _ (Id p name) e) = do
   (Env stack _) <- get
   case getVarType name stack of 
     Nothing -> typeError p -- Undefined variable
-    Just t  -> if t == exprType then return DTBool else typeError (exprPos e)
+    Just t  -> if t == exprType then return t else typeError (exprPos e)
 
 checkExpr (Var (Id p name)) = do 
   (Env stack _) <- get
@@ -132,9 +122,9 @@ checkEquality p e1 e2 = do
 
 checkStatement :: DataType -> Stmnt -> Checker ()
 checkStatement rettype (ReturnVoid p) = 
-  if rettype == DTVoid then return () else typeError p
+  if rettype == DTVoid then modify (\(Env s _) -> Env s True) else typeError p
 checkStatement rettype (Return p e) = 
-  checkExpr e >>= \t -> if rettype == t then return () else typeError p
+  checkExpr e >>= \t -> if rettype == t then modify (\(Env s _) -> Env s True) else typeError p
 checkStatement _       (Expr e  ) = 
   void $ checkExpr e 
 checkStatement rettype (IfElse _ _ e s1 s2) = do 
@@ -145,7 +135,7 @@ checkStatement rettype (IfElse _ _ e s1 s2) = do
   else
     typeError (exprPos e) -- Condition not bool
 
-checkStatement rettype (If p e s) = 
+checkStatement rettype (If _ e s) = 
   checkExpr e 
   >>= bool (typeError (exprPos e)) (checkStatement rettype (StmntList [s])) . (== DTBool)
 checkStatement rettype (While _ e s) = 
@@ -153,31 +143,37 @@ checkStatement rettype (While _ e s) =
   >>= bool (typeError (exprPos e)) (checkStatement rettype (StmntList [s])) . (== DTBool)
 
 checkStatement _ (VariableDecl (Variable t (Id p name))) = do 
-  (Env stack fs) <- get
+  (Env stack b) <- get
   if name `Map.member` head stack then
     typeError p -- Variable already exists in current top scope.
   else do
     let newhead = Map.insert name (typeToDataType t) $ head stack
-    put (Env (newhead:tail stack) fs)
+    put (Env (newhead:tail stack) b)
 
 checkStatement rettype (StmntList ss) = do 
-  modify (\(Env st fs) -> Env (Map.empty:st) fs)
-  foldr ((>>) . checkStatement rettype) (return ()) ss
-  modify (\(Env st fs) -> Env (tail st) fs)
+  modify (\(Env st b) -> Env (Map.empty:st) b)
+  mapM_ (checkStatement rettype) ss
+  modify (\(Env st b) -> Env (tail st) b)
 
 
 
 
 -- Make sure that a non-void function has a return.
 
-checkFunction :: Function -> Checker a
-checkFunction (Function t (Id p s) vs stmnts) = undefined
+checkFunction :: Function -> Checker ()
+checkFunction (Function t (Id p s) vs stmnts) = do 
+  let params = Map.fromList $ map (\(Variable t (Id _ s)) -> (s, typeToDataType t)) vs
+  modify (\(Env _ _) -> Env [Map.empty, params] False)
+  mapM_ (checkStatement (typeToDataType t)) stmnts
+
+  (Env _ b) <- get
+  when (not b && typeToDataType t /= DTVoid) $ typeError (typePos t) 
 
 
-typechecker :: Program -> Either String ()
-typechecker program = 
-  let funcs = 
-        map (\(Function t (Id _ s) vs _) -> FunctionType (typeToDataType t) s vs) program
-      baseEnv = Env [Map.empty] funcs
+typecheck :: Program -> Either (Int, Int) ()
+typecheck program = 
+  let baseEnv = Env [] False
 
-  in Right ()
+      res = mapM_ checkFunction program :: Checker ()
+
+  in fst $ evalRWS (runExceptT res) program baseEnv
