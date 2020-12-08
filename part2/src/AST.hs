@@ -9,6 +9,7 @@ module AST (
   , getPrecedence
   , getExprs
   , exprPos
+  , typePos
 ) where
 
 import Lex
@@ -80,6 +81,10 @@ getExprs (Plus        _ e1 e2) = (e1, e2)
 getExprs (Minus       _ e1 e2) = (e1, e2) 
 getExprs (Times       _ e1 e2) = (e1, e2) 
 getExprs (Div         _ e1 e2) = (e1, e2) 
+
+typePos (IntType p)  = p
+typePos (BoolType p) = p
+typePos (VoidType p) = p
 
 
 exprPos (Or          p _ _) = p  

@@ -7,6 +7,7 @@ import AST
 import HappyParser
 import PrettyPrinter
 import Interpreter
+import Typechecker
 
 someFunc :: IO ()
 someFunc = test23
@@ -78,3 +79,18 @@ test23_file = do
   case res of
     Right p -> return () -- print p
     Left err -> putStrLn $ "INTERPRETATION ERROR: \n" ++ err
+
+
+test24 :: IO ()
+test24 = do 
+  input <- getContents
+  
+  let code = unlines $ dropWhile (\s -> not (null s) && head s == '/') $ lines input
+  -- let (res, output) = testing 
+  let program = case parse code of Ok a -> a; Error err -> error err
+
+  -- print program
+  case typecheck program of 
+    Left (line, col) -> putStrLn $ "fail " ++ show (line + 1) ++ " " ++ show col
+    Right _ -> putStrLn "pass"
+

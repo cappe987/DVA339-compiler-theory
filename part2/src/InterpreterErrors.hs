@@ -43,6 +43,9 @@ conditionTypeError p dt statementName =
     lift $ throwError $ "Expected bool in condition to " ++ statementName ++ "-statement at " ++ printAlexPosn p ++ ". Got " ++ show dt
 
 
+varAlreadyDeclaredError :: AlexPosn -> String -> FunInterpreter a
+varAlreadyDeclaredError p name = 
+    lift $ throwError $ "Variable \'" ++ name ++ "\' at " ++ printAlexPosn p ++ " has already been declared."
 
 -- Adds stack trace to any function call, in case it fails inside it.
 addStackTrace :: String -> AlexPosn -> ExprInterpreter a -> ExprInterpreter a

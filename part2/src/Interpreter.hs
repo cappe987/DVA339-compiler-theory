@@ -145,8 +145,8 @@ callFunction (Id p name) es = do
             zipWithM setParam es params -- Maps the arguments to params
   
   prevState <- get -- Saves state before function call
-  let newstate = Map.fromList paramVals
-  put [newstate] -- Assigns new empty state for function call
+  let paramMap = Map.fromList paramVals
+  put [Map.empty, paramMap] -- Assigns new empty state for function call
 
   -- Calls function
   res <- addStackTrace name p $ runExceptT (evalFunction name (typeToDataType t) stmnts)
@@ -204,8 +204,12 @@ evalStmnt :: DataType -> Stmnt -> FunInterpreter ()
 evalStmnt dt (Expr e) = do 
   lift $ evalExpr e
   return ()
-evalStmnt dt (VariableDecl (Variable t (Id _ name))) = 
-  modify (varDeclare name (typeToDataType t)) 
+evalStmnt dt (VariableDecl (Variable t (Id p name))) = do 
+  st <- get
+  if varExistsInTopEnv name st then
+    varAlreadyDeclaredError p name
+  else
+    modify (varDeclare name (typeToDataType t)) 
   -- If the variable is already declared on the same level it is just overwritten.
   -- Didn't find anything for how to handle it. 
 evalStmnt dt (If p e stmnt) = evalIfElse p e (evalStmnt dt stmnt) (return ())
