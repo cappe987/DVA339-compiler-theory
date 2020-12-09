@@ -43,7 +43,7 @@ data CExpr
   | CInt    Int
   | CVar    DataType Id
   | CBool   Bool
-  | CCall   Id [CExpr]
+  | CCall   Id [(CExpr, DataType)]
   deriving Show
 
 data CStatement 
@@ -87,12 +87,12 @@ checkArgs (a:args) (Variable t (Id p name):params) =
   else
     typeError p
 
-checkPrint :: [Expr] -> Checker [CExpr]
+checkPrint :: [Expr] -> Checker [(CExpr, DataType)]
 checkPrint [] = return []
 checkPrint (e:es) = do 
   (c,t) <- checkExpr e
   if t /= DTVoid then
-    (c:) <$> checkPrint es 
+    ((c,t):) <$> checkPrint es 
   else
     typeError (exprPos e)
 
@@ -154,7 +154,7 @@ checkExpr (Call (Id p name) es)  = do
       else do
         esTypes <- mapM checkExpr es
         checkArgs (snd <$> esTypes) vs
-        return (CCall (Id p name) (fst <$> esTypes), typeToDataType rettype)
+        return (CCall (Id p name) esTypes, typeToDataType rettype)
 
 
 checkExpr (Equal  p e1 e2) = checkEquality p e1 e2 CEqual
