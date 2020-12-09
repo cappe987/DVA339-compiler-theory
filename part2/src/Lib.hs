@@ -10,7 +10,7 @@ import Interpreter
 import Typechecker
 
 someFunc :: IO ()
-someFunc = test23
+someFunc = test24
 
 parse :: String -> E Program
 parse = happyParser . alexScanTokens
@@ -94,3 +94,15 @@ test24 = do
     Left (line, col) -> putStrLn $ "fail " ++ show (line + 1) ++ " " ++ show col
     Right _ -> putStrLn "pass"
 
+test24_file :: IO ()
+test24_file = do
+  input <- readFile "src/test.c"
+  
+  let code = unlines $ dropWhile (\s -> not (null s) && head s == '/') $ lines input
+  -- let (res, output) = testing 
+  let program = case parse code of Ok a -> a; Error err -> error err
+
+  -- print program
+  case typecheck program of 
+    Left (line, col) -> putStrLn $ "fail " ++ show (line + 1) ++ " " ++ show col
+    Right p -> putStrLn "pass" >> print p

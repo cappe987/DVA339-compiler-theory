@@ -6,19 +6,57 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Data.List
 import Data.Bool
+-- import Debug.Trace
 
 import AST
 import Datatypes
 import Lex
 
 
-data FunctionType = FunctionType DataType String [Variable]
+-- data FunctionType = FunctionType DataType String [Variable] 
 
 type Stack = [Map.Map String DataType]
 
 data Env = Env Stack Bool -- Bool indicates if a function has a return statement or not
 
 type Checker = ExceptT (Int, Int) (RWS Program () Env)
+
+data CFunction = CFunction Type Id [Variable] [CStatement]
+  deriving Show
+
+data CExpr 
+  = CPlus   CExpr CExpr
+  | CMinus  CExpr CExpr
+  | CTimes  CExpr CExpr
+  | CDiv    CExpr CExpr
+  | CEqual  CExpr CExpr DataType
+  | CNEqual CExpr CExpr DataType
+  | CLT     CExpr CExpr
+  | CGT     CExpr CExpr
+  | CLEQ    CExpr CExpr
+  | CGEQ    CExpr CExpr
+  | COr     CExpr CExpr
+  | CAnd    CExpr CExpr
+  | CNot    CExpr
+  | CNeg    CExpr
+  | CAsn    DataType Id CExpr
+  | CInt    Int
+  | CVar    DataType Id
+  | CBool   Bool
+  | CCall   Id [CExpr]
+  deriving Show
+
+data CStatement 
+  = CReturnVoid
+  | CReturn     CExpr DataType
+  | CExpr       CExpr
+  | CIf         CExpr CStatement
+  | CIfElse     CExpr CStatement CStatement
+  | CWhile      CExpr CStatement
+  | CStmntList  Int [CStatement]
+  | CVarDecl    DataType Id
+  deriving Show
+
 
 
 typeError :: AlexPosn -> Checker a
@@ -32,11 +70,11 @@ getVarType :: String -> Stack -> Maybe DataType
 getVarType name = 
   fromMaybe Nothing . find isJust . map (Map.lookup name) 
 
-hasType :: Expr -> DataType -> Checker DataType
+hasType :: Expr -> DataType -> Checker (CExpr, DataType)
 hasType expr t = do 
-  exprType <- checkExpr expr
+  (cexpr, exprType) <- checkExpr expr
   if exprType == t then 
-    return t
+    return (cexpr, t)
   else
     typeError (exprPos expr)
 
@@ -49,47 +87,63 @@ checkArgs (a:args) (Variable t (Id p name):params) =
   else
     typeError p
 
-checkPrint :: [Expr] -> Checker ()
-checkPrint [] = return ()
+checkPrint :: [Expr] -> Checker [CExpr]
+checkPrint [] = return []
 checkPrint (e:es) = do 
-  t <- checkExpr e
+  (c,t) <- checkExpr e
   if t /= DTVoid then
-    checkPrint es
+    (c:) <$> checkPrint es 
   else
     typeError (exprPos e)
 
+checkBinary :: Expr -> Expr -> DataType -> DataType -> (CExpr -> CExpr -> CExpr) -> Checker (CExpr, DataType)
+checkBinary e1 e2 t1 t2 f = do 
+  (c1, t) <- e1 `hasType` t1 
+  (c2, _) <- e2 `hasType` t2
+  return (f c1 c2, t)
 
-checkExpr :: Expr -> Checker DataType
-checkExpr (Or  _ e1 e2) = e1 `hasType` DTBool >> e2 `hasType` DTBool
-checkExpr (And _ e1 e2) = e1 `hasType` DTBool >> e2 `hasType` DTBool
-checkExpr (Not _ e)     = e  `hasType` DTBool
+checkExpr :: Expr -> Checker (CExpr, DataType)
+checkExpr (Or  _ e1 e2) = checkBinary e1 e2 DTBool DTBool COr
 
-checkExpr (Plus  _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt
-checkExpr (Minus _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt
-checkExpr (Times _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt
-checkExpr (Div   _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt
-checkExpr (Neg   _ e    ) = e  `hasType` DTInt 
+checkExpr (And _ e1 e2) = checkBinary e1 e2 DTBool DTBool CAnd
+checkExpr (Not _ e)     = e `hasType` DTBool >>= (\(c, t) -> return (CNot c, t))
 
-checkExpr (LEQ         _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt >>return DTBool
-checkExpr (GEQ         _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt >>return DTBool
-checkExpr (LessThan    _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt >>return DTBool
-checkExpr (GreaterThan _ e1 e2) = e1 `hasType` DTInt >> e2 `hasType` DTInt >>return DTBool
+checkExpr (Plus  _ e1 e2) = checkBinary e1 e2 DTInt DTInt CPlus
+checkExpr (Minus _ e1 e2) = checkBinary e1 e2 DTInt DTInt CMinus
+checkExpr (Times _ e1 e2) = checkBinary e1 e2 DTInt DTInt CTimes
+checkExpr (Div   _ e1 e2) = checkBinary e1 e2 DTInt DTInt CDiv
+checkExpr (Neg   _ e    ) = e `hasType` DTInt >>= (\(c, t) -> return (CNeg c, t))
 
-checkExpr (Int     _ _) = return DTInt
-checkExpr (Boolean _ _) = return DTBool
+checkExpr (LEQ         _ e1 e2) = 
+  checkBinary e1 e2 DTInt DTInt CLEQ >>= (\(c,_) -> return (c, DTBool))
+checkExpr (GEQ         _ e1 e2) = 
+  checkBinary e1 e2 DTInt DTInt CGEQ >>= (\(c,_) -> return (c, DTBool))
+checkExpr (LessThan    _ e1 e2) = 
+  checkBinary e1 e2 DTInt DTInt CLT >>= (\(c,_) -> return (c, DTBool))
+checkExpr (GreaterThan _ e1 e2) = 
+  checkBinary e1 e2 DTInt DTInt CGT >>= (\(c,_) -> return (c, DTBool))
+
+checkExpr (Int     _ i) = return (CInt i , DTInt )
+checkExpr (Boolean _ b) = return (CBool b, DTBool)
 
 checkExpr (Asn _ (Id p name) e) = do 
-  exprType <- checkExpr e
+  (c, exprType) <- checkExpr e
   (Env stack _) <- get
   case getVarType name stack of 
     Nothing -> typeError p -- Undefined variable
-    Just t  -> if t == exprType then return t else typeError (exprPos e)
+    Just t  -> if t == exprType then 
+                return (CAsn t (Id p name) c,t) 
+              else 
+                typeError (exprPos e)
 
 checkExpr (Var (Id p name)) = do 
   (Env stack _) <- get
-  maybe (typeError p) return (getVarType name stack)
+  case getVarType name stack of
+    Nothing -> typeError p
+    Just t -> return (CVar t (Id p name), t)
 
-checkExpr (Call (Id p "print") es)  = checkPrint es >> return DTVoid
+checkExpr (Call (Id p "print") es)  = 
+  checkPrint es >>= \cs -> return (CCall (Id p "print") cs, DTVoid) 
 checkExpr (Call (Id p name) es)  = do 
   program <- ask
   case find (\(Function _ (Id _ n) _ _) -> n == name) program of 
@@ -99,48 +153,65 @@ checkExpr (Call (Id p name) es)  = do
         typeError p -- Too many or too few arguments
       else do
         esTypes <- mapM checkExpr es
-        checkArgs esTypes vs
-        return (typeToDataType rettype)
+        checkArgs (snd <$> esTypes) vs
+        return (CCall (Id p name) (fst <$> esTypes), typeToDataType rettype)
 
 
-checkExpr (Equal  p e1 e2) = checkEquality p e1 e2
+checkExpr (Equal  p e1 e2) = checkEquality p e1 e2 CEqual
   
-checkExpr (NEqual p e1 e2) = checkEquality p e1 e2
+checkExpr (NEqual p e1 e2) = checkEquality p e1 e2 CNEqual
 
-checkEquality p e1 e2 = do
-  t1 <- checkExpr e1
+checkEquality p e1 e2 f = do
+  (c1,t1) <- checkExpr e1
   if t1 == DTVoid then
     typeError (exprPos e1)
   else do 
-    t2 <- checkExpr e2
+    (c2,t2) <- checkExpr e2
     if t2 == DTVoid then
       typeError (exprPos e2)
     else if t1 /= t2 then
       typeError p
     else
-      return DTBool
+      return (f c1 c2 t1, DTBool)
 
-checkStatement :: DataType -> Stmnt -> Checker ()
+checkStatement :: DataType -> Stmnt -> Checker CStatement
 checkStatement rettype (ReturnVoid p) = 
-  if rettype == DTVoid then modify (\(Env s _) -> Env s True) else typeError p
+  if rettype == DTVoid then do 
+    modify (\(Env s _) -> Env s True) 
+    return CReturnVoid
+  else 
+    typeError p
 checkStatement rettype (Return p e) = 
-  checkExpr e >>= \t -> if rettype == t then modify (\(Env s _) -> Env s True) else typeError p
+  checkExpr e >>= \(c,t) -> if rettype == t then do 
+                              modify (\(Env s _) -> Env s True) 
+                              return $ CReturn c t
+                            else 
+                              typeError p
 checkStatement _       (Expr e  ) = 
-  void $ checkExpr e 
+  checkExpr e >>= \(c,t) -> return $ CExpr c
 checkStatement rettype (IfElse _ _ e s1 s2) = do 
-  t <- checkExpr e
+  (c,t) <- checkExpr e
   if t == DTBool then do 
-    checkStatement rettype (StmntList [s1]) -- Creates a block in case there wasn't one.
-    checkStatement rettype (StmntList [s2]) -- To handle shadowing proplerly
+    c1 <- checkStatement rettype (StmntList [s1]) -- Creates a block in case there wasn't one.
+    c2 <- checkStatement rettype (StmntList [s2]) -- To handle shadowing proplerly
+    return $ CIfElse c c1 c2
   else
     typeError (exprPos e) -- Condition not bool
 
-checkStatement rettype (If _ e s) = 
-  checkExpr e 
-  >>= bool (typeError (exprPos e)) (checkStatement rettype (StmntList [s])) . (== DTBool)
-checkStatement rettype (While _ e s) = 
-  checkExpr e 
-  >>= bool (typeError (exprPos e)) (checkStatement rettype (StmntList [s])) . (== DTBool)
+checkStatement rettype (If _ e s) = do
+  (c,t) <- checkExpr e 
+  if t == DTBool then do
+    c1 <- checkStatement rettype (StmntList [s])
+    return $ CIf c c1
+  else
+    typeError (exprPos e)
+checkStatement rettype (While _ e s) = do
+  (c,t) <- checkExpr e 
+  if t == DTBool then do
+   c1 <- checkStatement rettype (StmntList [s])
+   return $ CWhile c c1
+  else
+   typeError (exprPos e)
 
 checkStatement _ (VariableDecl (Variable t (Id p name))) = do 
   (Env stack b) <- get
@@ -149,31 +220,34 @@ checkStatement _ (VariableDecl (Variable t (Id p name))) = do
   else do
     let newhead = Map.insert name (typeToDataType t) $ head stack
     put (Env (newhead:tail stack) b)
+    return $ CVarDecl (typeToDataType t) (Id p name)
 
 checkStatement rettype (StmntList ss) = do 
   modify (\(Env st b) -> Env (Map.empty:st) b)
-  mapM_ (checkStatement rettype) ss
+  cs <- mapM (checkStatement rettype) ss
   modify (\(Env st b) -> Env (tail st) b)
+  return $ CStmntList (length ss) cs
 
 
 
 
 -- Make sure that a non-void function has a return.
 
-checkFunction :: Function -> Checker ()
+checkFunction :: Function -> Checker CFunction
 checkFunction (Function t (Id p s) vs stmnts) = do 
   let params = Map.fromList $ map (\(Variable t (Id _ s)) -> (s, typeToDataType t)) vs
   modify (\(Env _ _) -> Env [Map.empty, params] False)
-  mapM_ (checkStatement (typeToDataType t)) stmnts
+  cs <- mapM (checkStatement (typeToDataType t)) stmnts
 
   (Env _ b) <- get
   when (not b && typeToDataType t /= DTVoid) $ typeError (typePos t) 
 
+  return $ CFunction t (Id p s) vs cs
 
-typecheck :: Program -> Either (Int, Int) ()
+
+typecheck :: Program -> Either (Int, Int) [CFunction]
 typecheck program = 
   let baseEnv = Env [] False
-
-      res = mapM_ checkFunction program :: Checker ()
+      res = mapM checkFunction program :: Checker [CFunction]
 
   in fst $ evalRWS (runExceptT res) program baseEnv
