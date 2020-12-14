@@ -5,15 +5,17 @@ import Control.Monad.Except
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.List
-import Data.Bool
--- import Debug.Trace
 
 import AST
 import Datatypes
 import Lex
 
 
--- data FunctionType = FunctionType DataType String [Variable] 
+--------------------------------------------
+-- Typechecker also needs to annotate some parts with type information.
+-- Hence the new tree type
+--------------------------------------------
+
 
 type Stack = [Map.Map String DataType]
 
