@@ -81,13 +81,14 @@ hasType expr t = do
     typeError (exprPos expr)
 
 
-checkArgs :: [DataType] -> [Variable] -> Checker ()
-checkArgs [] [] = return ()
-checkArgs (a:args) (Variable t (Id p name):params) =
-  if a == typeToDataType t then
-    checkArgs args params
+checkArgs :: [Expr] -> [Variable] -> Checker [(CExpr, DataType)]
+checkArgs [] [] = return []
+checkArgs (e:args) (Variable t (Id _ _):params) = do
+  (c, t') <- checkExpr e
+  if t' == typeToDataType t then
+    ((c,t') :) <$> checkArgs args params
   else
-    typeError p
+    typeError (exprPos e)
 
 checkPrint :: [Expr] -> Checker [(CExpr, DataType)]
 checkPrint [] = return []
@@ -154,8 +155,7 @@ checkExpr (Call (Id p name) es)  = do
       if length es /= length vs then
         typeError p -- Too many or too few arguments
       else do
-        esTypes <- mapM checkExpr es
-        checkArgs (snd <$> esTypes) vs
+        esTypes <- checkArgs es vs
         return (CCall (Id p name) esTypes, typeToDataType rettype)
 
 
@@ -242,7 +242,8 @@ checkFunction (Function t (Id p s) vs stmnts) = do
   cs <- mapM (checkStatement (typeToDataType t)) stmnts
 
   (Env _ b) <- get
-  when (not b && typeToDataType t /= DTVoid) $ typeError (typePos t) 
+  -- This line checks if there exists no return. The new tests doesn't need this.
+  -- when (not b && typeToDataType t /= DTVoid) $ typeError (typePos t) 
 
   return $ CFunction t (Id p s) vs cs
 
