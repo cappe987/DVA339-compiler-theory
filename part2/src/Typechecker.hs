@@ -23,7 +23,7 @@ data Env = Env Stack Bool -- Bool indicates if a function has a return statement
 
 type Checker = ExceptT (Int, Int) (RWS Program () Env)
 
-data CFunction = CFunction Type Id [Variable] [CStatement]
+data CFunction = CFunction Type String [(DataType, String)] [CStatement]
   deriving Show
 
 data CExpr 
@@ -41,9 +41,9 @@ data CExpr
   | CAnd    CExpr CExpr
   | CNot    CExpr
   | CNeg    CExpr
-  | CAsn    DataType Id CExpr
+  | CAsn    DataType String CExpr
   | CInt    Int
-  | CVar    DataType Id
+  | CVar    DataType String
   | CBool   Bool
   | CCall   Id [(CExpr, DataType)]
   deriving Show
@@ -51,12 +51,12 @@ data CExpr
 data CStatement 
   = CReturnVoid
   | CReturn     CExpr DataType
-  | CExpr       CExpr
+  | CExpr       CExpr DataType
   | CIf         CExpr CStatement
   | CIfElse     CExpr CStatement CStatement
   | CWhile      CExpr CStatement
   | CStmntList  Int [CStatement]
-  | CVarDecl    DataType Id
+  | CVarDecl    DataType String
   deriving Show
 
 
@@ -135,7 +135,7 @@ checkExpr (Asn _ (Id p name) e) = do
   case getVarType name stack of 
     Nothing -> typeError p -- Undefined variable
     Just t  -> if t == exprType then 
-                return (CAsn t (Id p name) c,t) 
+                return (CAsn t name c,t) 
               else 
                 typeError (exprPos e)
 
@@ -143,7 +143,7 @@ checkExpr (Var (Id p name)) = do
   (Env stack _) <- get
   case getVarType name stack of
     Nothing -> typeError p
-    Just t -> return (CVar t (Id p name), t)
+    Just t -> return (CVar t name, t)
 
 checkExpr (Call (Id p "print") es)  = 
   checkPrint es >>= \cs -> return (CCall (Id p "print") cs, DTVoid) 
@@ -190,7 +190,7 @@ checkStatement rettype (Return p e) =
                             else 
                               typeError p
 checkStatement _       (Expr e  ) = 
-  checkExpr e >>= \(c,t) -> return $ CExpr c
+  checkExpr e >>= \(c,t) -> return $ CExpr c t
 checkStatement rettype (IfElse _ _ e s1 s2) = do 
   (c,t) <- checkExpr e
   if t == DTBool then do 
@@ -222,15 +222,17 @@ checkStatement _ (VariableDecl (Variable t (Id p name))) = do
   else do
     let newhead = Map.insert name (typeToDataType t) $ head stack
     put (Env (newhead:tail stack) b)
-    return $ CVarDecl (typeToDataType t) (Id p name)
+    return $ CVarDecl (typeToDataType t) name
 
 checkStatement rettype (StmntList ss) = do 
   modify (\(Env st b) -> Env (Map.empty:st) b)
   cs <- mapM (checkStatement rettype) ss
   modify (\(Env st b) -> Env (tail st) b)
-  return $ CStmntList (length ss) cs
+  return $ CStmntList (length (filter isDecl ss)) cs
 
 
+isDecl (VariableDecl _) = True
+isDecl _ = False
 
 
 -- Make sure that a non-void function has a return.
@@ -244,8 +246,8 @@ checkFunction (Function t (Id p s) vs stmnts) = do
   (Env _ b) <- get
   -- This line checks if there exists no return. The new tests doesn't need this.
   -- when (not b && typeToDataType t /= DTVoid) $ typeError (typePos t) 
-
-  return $ CFunction t (Id p s) vs cs
+  let vars = map (\(Variable t (Id _ name)) -> (typeToDataType t, name)) vs
+  return $ CFunction t s vars cs
 
 
 typecheck :: Program -> Either (Int, Int) [CFunction]

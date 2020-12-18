@@ -8,9 +8,10 @@ import HappyParser
 import PrettyPrinter
 import Interpreter
 import Typechecker
+import Renamer
 
 someFunc :: IO ()
-someFunc = test24
+someFunc = test25
 
 parse :: String -> E Program
 parse = happyParser . alexScanTokens
@@ -106,3 +107,20 @@ test24_file = do
   case typecheck program of 
     Left (line, col) -> putStrLn $ "fail " ++ show (line + 1) ++ " " ++ show col
     Right p -> putStrLn "pass" >> print p
+
+
+test25 :: IO () 
+test25 = do 
+  code <- readFile "src/test.c" 
+
+  let ast = 
+        case parse code of 
+          Ok program -> case typecheck program of 
+                          Right ok -> ok
+                          Left err -> error $ show err
+          Error err  -> error err
+
+  print ast
+  print $ rename ast
+  
+  return ()
