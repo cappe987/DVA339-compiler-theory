@@ -45,7 +45,7 @@ data CExpr
   | CInt    Int
   | CVar    DataType String
   | CBool   Bool
-  | CCall   Id [(CExpr, DataType)]
+  | CCall   String [(CExpr, DataType)]
   deriving Show
 
 data CStatement 
@@ -146,7 +146,7 @@ checkExpr (Var (Id p name)) = do
     Just t -> return (CVar t name, t)
 
 checkExpr (Call (Id p "print") es)  = 
-  checkPrint es >>= \cs -> return (CCall (Id p "print") cs, DTVoid) 
+  checkPrint es >>= \cs -> return (CCall "print" cs, DTVoid) 
 checkExpr (Call (Id p name) es)  = do 
   program <- ask
   case find (\(Function _ (Id _ n) _ _) -> n == name) program of 
@@ -156,7 +156,7 @@ checkExpr (Call (Id p name) es)  = do
         typeError p -- Too many or too few arguments
       else do
         esTypes <- checkArgs es vs
-        return (CCall (Id p name) esTypes, typeToDataType rettype)
+        return (CCall name esTypes, typeToDataType rettype)
 
 
 checkExpr (Equal  p e1 e2) = checkEquality p e1 e2 CEqual

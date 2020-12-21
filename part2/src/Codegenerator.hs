@@ -61,8 +61,8 @@ data Instruction
   | BSRLabel String
   | RTS
   -- Output
-  | WRITEINT Int
-  | WRITEBOOL Int
+  | WRITEINT 
+  | WRITEBOOL 
   -- Labels for the first pass
   | LABEL String
   deriving Show
@@ -107,13 +107,41 @@ compileExpr (CLEQ e1 e2)       =
   (NOT :) . (GTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CGEQ e1 e2)       = 
   (NOT :) . (LTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
--- compileExpr (COr e1 e2)        = 
--- compileExpr (CAnd e1 e2)       = 
 compileExpr (CNot e)           = (NOT :) <$> compileExpr e
 compileExpr (CNeg e)           = (NEG :) <$> compileExpr e
 compileExpr (CBool b)          = return [PUSHBOOL (if b then 1 else 0)]
 compileExpr (CInt i)           = return [PUSHINT i]
--- compileExpr (CCall id es)           = 
+
+compileExpr (COr e1 e2)        = 
+  foldl1 (\acc s -> (++) <$> s <*> acc) 
+  [compileExpr e1
+  , return [BRFLabel "RIGHT"]
+  , return [PUSHBOOL 1]
+  , return [BRALabel "END"]
+  , return [LABEL "RIGHT"]
+  , compileExpr e2
+  , return [LABEL "END"]]
+
+compileExpr (CAnd e1 e2)       = 
+  foldl1 (\acc s -> (++) <$> s <*> acc) 
+  [ compileExpr e1
+  , return [BRFLabel "SHORTCUT"]
+  , compileExpr e2
+  , return [BRALabel "END"]
+  , return [LABEL "SHORTCUT"]
+  , return [PUSHBOOL 0]
+  , return [LABEL "END"]]
+
+compileExpr (CCall "print" es) = 
+  foldl (\acc e -> (++) <$> compilePrintArg e <*> acc) (return []) es
+
+compileExpr (CCall name es) = do 
+  let n = length es
+  -- Output arguments in reverse, so first argument is evaluated last.
+  args <- foldr ((\e acc -> (++) <$> compileExpr e <*> acc) . fst) (return []) es
+  return $ POP n : BSRLabel name : args ++ [DECL 1]
+
+
 compileExpr (CAsn dt name e) = do 
   let rvalt = if dt == DTInt then RVALINT else RVALBOOL
   env <- get 
@@ -129,6 +157,9 @@ compileExpr (CVar dt name) = do
     Just offset -> return [RVALINT offset]
 
 
+compilePrintArg :: (CExpr, DataType) -> Generator [Instruction]
+compilePrintArg (e, DTInt ) = (WRITEINT  :) <$> compileExpr e
+compilePrintArg (e, DTBool) = (WRITEBOOL :) <$> compileExpr e
 
 
 compileStatement :: CStatement -> Generator [Instruction]
@@ -146,9 +177,12 @@ compileStatement (CStmntList i cs) =
 compile tree = 
   -- reverse . concat . reverse $ evalState (mapM compileStatement tree) initState
   -- reverse . concat . reverse $ 
+
+  -- The final reverse here is only to make it so the first element is the first one executed. Since it build it by appending to the front.
   reverse $ evalState (compileStatement tree) initState
 
-  where initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
+  -- where initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
+initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
 
 
 ex = CStmntList 2 
