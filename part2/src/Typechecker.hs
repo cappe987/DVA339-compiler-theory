@@ -23,7 +23,7 @@ data Env = Env Stack Bool -- Bool indicates if a function has a return statement
 
 type Checker = ExceptT (Int, Int) (RWS Program () Env)
 
-data CFunction = CFunction Type String [(DataType, String)] [CStatement]
+data CFunction = CFunction DataType String [(DataType, String)] CStatement
   deriving Show
 
 data CExpr 
@@ -247,7 +247,8 @@ checkFunction (Function t (Id p s) vs stmnts) = do
   -- This line checks if there exists no return. The new tests doesn't need this.
   -- when (not b && typeToDataType t /= DTVoid) $ typeError (typePos t) 
   let vars = map (\(Variable t (Id _ name)) -> (typeToDataType t, name)) vs
-  return $ CFunction t s vars cs
+  return $ 
+    CFunction (typeToDataType  t) s vars (CStmntList (length (filter isDecl stmnts)) cs)
 
 
 typecheck :: Program -> Either (Int, Int) [CFunction]

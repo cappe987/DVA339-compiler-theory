@@ -65,6 +65,7 @@ data Instruction
   | WRITEBOOL 
   -- Labels for the first pass
   | LABEL String
+  | FUNCTION String
   deriving Show
 
 
@@ -117,20 +118,20 @@ compileExpr (COr e1 e2)        =
   [compileExpr e1
   , return [BRFLabel "RIGHT"]
   , return [PUSHBOOL 1]
-  , return [BRALabel "END"]
+  , return [BRALabel "OREND"]
   , return [LABEL "RIGHT"]
   , compileExpr e2
-  , return [LABEL "END"]]
+  , return [LABEL "OREND"]]
 
 compileExpr (CAnd e1 e2)       = 
   foldl1 (\acc s -> (++) <$> s <*> acc) 
   [ compileExpr e1
   , return [BRFLabel "SHORTCUT"]
   , compileExpr e2
-  , return [BRALabel "END"]
+  , return [BRALabel "ANDEND"]
   , return [LABEL "SHORTCUT"]
   , return [PUSHBOOL 0]
-  , return [LABEL "END"]]
+  , return [LABEL "ANDEND"]]
 
 compileExpr (CCall "print" es) = 
   foldl (\acc e -> (++) <$> compilePrintArg e <*> acc) (return []) es
@@ -173,20 +174,63 @@ compileStatement (CVarDecl _ name) = do
 compileStatement (CStmntList i cs) = 
   (POP i :) . concat . reverse <$> mapM compileStatement cs
 
+compileStatement (CIfElse e s1 s2) = 
+  foldl1 (\acc s -> (++) <$> s <*> acc) 
+  [ compileExpr e
+  , return [BRFLabel "ELSE"]
+  , compileStatement s1
+  , return [BRALabel "IFEND"]
+  , return [LABEL "ELSE"]
+  , compileStatement s2
+  , return [LABEL "IFEND"]]
+
+compileStatement (CIf e s) = compileStatement (CIfElse e s (CStmntList 0 []))
+
+compileStatement (CWhile e s) =
+  foldl1 (\acc s -> (++) <$> s <*> acc) 
+  [ return [LABEL "WHILE"]
+  , compileExpr e
+  , return [BRFLabel "WHILEEND"]
+  , compileStatement s
+  , return [BRALabel "WHILE"]
+  , return [LABEL "WHILEEND"]]
+
+compileStatement CReturnVoid = return [RTS, UNLINK]
+compileStatement (CReturn e dt) = do 
+  let assign = if dt == DTInt then ASSINT else ASSBOOL
+  env <- get
+  expr <- compileExpr e
+  return $ [RTS, UNLINK, assign] ++ expr ++ [LVAL (returnoffset env)]
+
+
+compileFunction :: CFunction -> Generator [Instruction]
+compileFunction (CFunction dt name params body) = do
+  let n = length params
+      newMap = foldl (\acc (i, (_,n)) -> Map.insert n i acc) Map.empty $ zip [1..] params
+      env = CompileEnv {offsets = newMap, returnoffset = n + 2, nextoffset = -1}
+  put env
+  body' <- compileStatement body
+  return $ RTS : UNLINK : body' ++ [LINK, FUNCTION name]
 
 compile tree = 
   -- reverse . concat . reverse $ evalState (mapM compileStatement tree) initState
   -- reverse . concat . reverse $ 
 
-  -- The final reverse here is only to make it so the first element is the first one executed. Since it build it by appending to the front.
+  -- The final reverse here is only to make it so the first element is the first one executed. Since it's built by appending to the front.
   reverse $ evalState (compileStatement tree) initState
 
   -- where initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
 initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
 
 
-ex = CStmntList 2 
+ex1 = CStmntList 2 
   [ CVarDecl DTInt "x"
   , CExpr (CAsn DTInt "x" (CInt 5)) DTInt
   , CVarDecl DTInt "y"
   , CExpr (CAsn DTInt "x" (CVar DTInt "y")) DTInt]
+
+
+ex2 = CIfElse (CBool True) (CExpr (CInt 5) DTInt) (CExpr (CInt 3) DTInt)
+ex3 = CIf (CBool True) (CExpr (CInt 5) DTInt) 
+
+ex4 = CWhile (CBool True) (CExpr (CInt 5) DTInt) 
