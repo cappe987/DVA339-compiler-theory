@@ -95,7 +95,7 @@ renameFunction (CFunction dt id vars stmnts) = do
 
   put [Map.empty, foldl (\acc (_,name) -> Map.insert name 0 acc) Map.empty vars]
 
-  CFunction dt id vars <$> mapM renameStmnt stmnts
+  CFunction dt id vars <$> renameStmnt stmnts
 
 rename :: [CFunction] -> [CFunction]
 rename funcs = 

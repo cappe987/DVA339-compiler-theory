@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Codegenerator where
 
 import qualified Data.Map as Map
@@ -10,6 +11,7 @@ import Data.List
 import Typechecker
 import Datatypes
 import AST
+import Debug.Trace
 
 -- data Label 
 --   = ELSE
@@ -66,7 +68,46 @@ data Instruction
   -- Labels for the first pass
   | LABEL String
   | FUNCTION String
-  deriving Show
+  | END -- Is END a valid statement? Not mentioned in Trac42 docs.
+  -- deriving Show
+
+instance Show Instruction where
+  show (PUSHINT i) = "PUSHINT " ++ show i
+  show (PUSHBOOL b) = "PUSHBOOL " ++ if b == 1 then "true" else "false"
+  show (RVALINT i) = "RVALINT " ++ show i ++ "(FP)"
+  show (RVALBOOL i) = "RVALBOOL " ++ show i ++ "(FP)"
+  show (LVAL i) = "LVAL " ++ show i ++ "(FP)"
+  show ASSINT = "ASSINT"
+  show ASSBOOL = "ASSBOOL"
+  show LINK = "LINK"
+  show UNLINK = "UNLINK"
+  show (DECL i) = "DECL " ++ show i
+  show (POP i) = "POP " ++ show i
+  show EQINT = "EQINT"
+  show LTINT = "LTINT"
+  show GTINT = "GTINT"
+  show NOT = "NOT"
+  show OR = "OR"
+  show AND = "AND"
+  show EQBOOL = "EQBOOL"
+  show ADD = "ADD"
+  show SUB = "SUB"
+  show MUL = "MUL"
+  show DIV = "DIV"
+  show NEG = "NEG"
+  show (BRF i) = "BRF " ++ show i
+  show (BRA i) = "BRA " ++ show i
+  show (BSR i) = "BSR " ++ show i
+  show RTS = "RTS"
+  show WRITEINT = "WRITEINT"
+  show WRITEBOOL = "WRITEBOOL"
+  show END = "END"
+
+  show (BSRLabel s) = "BSRLABEL " ++ s
+  show (BRALabel s) = "BRALABEL " ++ s
+  show (BRFLabel s) = "BRFLABEL " ++ s
+  show (FUNCTION s) = "FUNCTION " ++ s
+  show (LABEL s) = "LABEL " ++ s
 
 
 data CompileEnv = CompileEnv 
@@ -212,12 +253,71 @@ compileFunction (CFunction dt name params body) = do
   body' <- compileStatement body
   return $ RTS : UNLINK : body' ++ [LINK, FUNCTION name]
 
-compile tree = 
-  -- reverse . concat . reverse $ evalState (mapM compileStatement tree) initState
-  -- reverse . concat . reverse $ 
+compileProgram :: [CFunction] -> Generator [Instruction]
+compileProgram cs = do 
+  funcs <- foldl (\acc f -> (++) <$> compileFunction f <*> acc) (return []) cs
+  
+  -- return $ filter (not . removable) $ funcs ++ [END, BSRLabel "main", DECL 1]
+  return $ filter (not . removable) $ funcs ++ [END, BSRLabel "main"]
 
-  -- The final reverse here is only to make it so the first element is the first one executed. Since it's built by appending to the front.
-  reverse $ evalState (compileStatement tree) initState
+
+removable (DECL 0) = True
+removable (POP 0)  = True
+removable _ = False
+
+-- data ReplaceState = ReplaceState 
+
+findMatching :: [Instruction] -> String -> Int -> Int
+findMatching xs s i = 
+  findMatch xs s 1 (i+1)
+  where
+    findMatch _ s 0 i = i
+    findMatch (LABEL    x:xs) s c i 
+      | x == s    = findMatch xs s (c-1) i
+      | otherwise = findMatch xs s c i
+    findMatch (BRFLabel x:xs) s c i 
+      | x == s    = findMatch xs s (c+1) (i+1)
+      | otherwise = findMatch xs s c (i+1)
+    findMatch (BRALabel x:xs) s c i 
+      | x == s    = findMatch xs s (c+1) (i+1)
+      | otherwise = findMatch xs s c (i+1)
+    findMatch (x:xs) s c i = findMatch xs s c (i+1)
+
+replace [] _ _ = []
+replace (BRALabel "WHILE":xs) i (whilePos:backtrack) = 
+  BRA whilePos : replace xs (i+1) backtrack
+replace (BRFLabel s:xs) i bt = 
+  BRF (findMatching xs s i) : replace xs (i+1) bt
+replace (BRALabel s:xs) i bt = 
+  BRA (findMatching xs s i) : replace xs (i+1) bt
+replace (LABEL s:xs) i bt 
+  | s == "WHILE" = replace xs i (i:bt)
+  | otherwise    = replace xs i bt
+
+replace (FUNCTION s:xs) i bt = 
+  FUNCTION s : replace xs i bt
+  -- Function names are kept, but index is ignored since they will be
+  -- removed in the next step.
+replace (x:xs) i bt = x : replace xs (i+1) bt
+
+
+-- Replaces everything but function labels and calls.
+passOne :: [Instruction] -> [Instruction]
+passOne xs = replace xs 0 []
+
+getFunctionAddress :: [(Int, String)] -> String -> Int
+getFunctionAddress xs s = fst $ head $ filter (\(i,s') -> s == s') xs
+
+-- Replaces function jumps (BSRLabel -> BSR)
+passTwo :: [Instruction] -> [Instruction]
+passTwo xs = 
+  let (funcs, rest) = partition (\case (i, FUNCTION _) -> True; _ -> False) $ zip [0..] xs
+      funcNames = map (\(i, FUNCTION s) -> (i,s)) funcs
+  in map ((\case BSRLabel s ->  BSR $ getFunctionAddress funcNames s; x -> x) . snd) rest
+
+compile tree = 
+  -- The reverse here is to make it so the first element is the first one executed. Since it's built by appending to the front.
+  passTwo . passOne $ reverse $ evalState (compileProgram tree) initState
 
   -- where initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
 initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}

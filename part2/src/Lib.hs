@@ -9,6 +9,7 @@ import PrettyPrinter
 import Interpreter
 import Typechecker
 import Renamer
+import Codegenerator
 
 someFunc :: IO ()
 someFunc = test25
@@ -108,9 +109,23 @@ test24_file = do
     Left (line, col) -> putStrLn $ "fail " ++ show (line + 1) ++ " " ++ show col
     Right p -> putStrLn "pass" >> print p
 
-
 test25 :: IO () 
-test25 = do 
+test25 = do
+  input <- getContents
+  let code = unlines $ dropWhile (\s -> not (null s) && head s == '/') $ lines input
+
+  let ast = 
+        case parse code of 
+          Ok program -> case typecheck program of 
+                          Right ok -> ok
+                          Left err -> error $ show err
+          Error err  -> error err
+
+  -- print ast
+  putStr $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast
+
+test25_file :: IO () 
+test25_file = do 
   code <- readFile "src/test.c" 
 
   let ast = 
@@ -120,7 +135,8 @@ test25 = do
                           Left err -> error $ show err
           Error err  -> error err
 
-  print ast
-  print $ rename ast
-  
-  return ()
+  -- print ast
+  -- print $ compile $ rename ast
+  -- putStrLn ""
+  -- print $ zip [0..] $ compile $ rename ast
+  putStr $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast
