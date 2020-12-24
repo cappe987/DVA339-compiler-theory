@@ -27,9 +27,13 @@ source-repository head
 
 library
   exposed-modules:
-      Interpreter
-      InterpreterBase
-      InterpreterErrors
+      Interpreter.Interpreter
+      Interpreter.InterpreterBase
+      Interpreter.InterpreterErrors
+      
+      Optimization.Folding
+      Optimization.Optimization
+
       Datatypes
       Typechecker
       Codegenerator
@@ -38,8 +42,6 @@ library
       AST
       Lex
       PrettyPrinter
-      Optimization.Folding
-      Optimization.Optimization
       Lib
   other-modules:
       -- Paths_part2

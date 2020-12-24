@@ -1,4 +1,4 @@
-module InterpreterBase where
+module Interpreter.InterpreterBase where
 
 import Control.Monad.Except
 import Control.Monad.RWS

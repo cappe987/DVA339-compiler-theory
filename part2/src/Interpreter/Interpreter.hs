@@ -1,4 +1,4 @@
-module Interpreter where
+module Interpreter.Interpreter where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -7,8 +7,8 @@ import Data.List
 
 import AST
 import Lex
-import InterpreterBase
-import InterpreterErrors
+import Interpreter.InterpreterBase
+import Interpreter.InterpreterErrors
 import Datatypes
 
 

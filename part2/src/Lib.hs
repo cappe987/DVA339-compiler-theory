@@ -6,7 +6,7 @@ import Lex
 import AST
 import HappyParser
 import PrettyPrinter
-import Interpreter
+import Interpreter.Interpreter
 import Typechecker
 import Renamer
 import Codegenerator

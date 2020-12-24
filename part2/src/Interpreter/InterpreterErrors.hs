@@ -1,8 +1,8 @@
-module InterpreterErrors where
+module Interpreter.InterpreterErrors where
 
 import Lex
 import AST
-import InterpreterBase
+import Interpreter.InterpreterBase
 import Datatypes
 import Control.Monad.Except
 
