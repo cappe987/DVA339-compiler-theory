@@ -51,7 +51,7 @@ data Instruction
   -- Int operations
   | ADD 
   | SUB
-  | MUL
+  | MULT
   | DIV
   | NEG
   -- Jump instructions
@@ -94,7 +94,7 @@ instance Show Instruction where
   show EQBOOL = "EQBOOL"
   show ADD = "ADD"
   show SUB = "SUB"
-  show MUL = "MUL"
+  show MULT = "MULT"
   show DIV = "DIV"
   show NEG = "NEG"
   show (BRF i) = "BRF " ++ show i
@@ -133,7 +133,7 @@ type Generator = State CompileEnv
 compileExpr :: CExpr -> Generator [Instruction]
 compileExpr (CPlus e1 e2)      = (ADD :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CMinus e1 e2)     = (SUB :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
-compileExpr (CTimes e1 e2)     = (MUL :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
+compileExpr (CTimes e1 e2)     = (MULT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CDiv e1 e2)       = (DIV :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CEqual e1 e2 DTInt ) = 
   (EQINT  :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
@@ -252,7 +252,7 @@ compileFunction :: CFunction -> Generator [Instruction]
 compileFunction (CFunction dt name params body) = do
   let n = length params
       newMap = foldl (\acc (i, (_,n)) -> Map.insert n i acc) Map.empty $ zip [2..] params
-      env = CompileEnv {offsets = newMap, returnoffset = n + 2, nextoffset = -1}
+      env = CompileEnv {offsets = newMap, returnoffset = n+2, nextoffset = -1}
   put env
   body' <- compileStatement body
   return $ RTS : UNLINK : body' ++ [LINK, FUNCTION name]
@@ -321,7 +321,7 @@ passTwo xs =
 
 compile tree = 
   -- The reverse here is to make it so the first element is the first one executed. Since it's built by appending to the front.
-  passTwo . passOne $ reverse $ evalState (compileProgram tree) initState
+  passTwo . passOne $ (DECL 1 :) $ reverse $ evalState (compileProgram tree) initState
 
   -- where initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
 initState = CompileEnv {offsets=Map.empty, returnoffset=0, nextoffset= -1}
