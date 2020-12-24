@@ -38,6 +38,8 @@ library
       AST
       Lex
       PrettyPrinter
+      Optimization.Folding
+      Optimization.Optimization
       Lib
   other-modules:
       -- Paths_part2
