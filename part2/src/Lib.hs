@@ -139,4 +139,23 @@ test25_file = do
   -- print $ compile $ rename ast
   -- putStrLn ""
   -- print $ zip [0..] $ compile $ rename ast
-  putStr $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast
+  writeFile "output.txt" $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast
+
+
+lab25_run :: String -> IO ()
+lab25_run s = do
+  input <- readFile s
+  let code = unlines $ dropWhile (\s -> not (null s) && head s == '/') $ lines input
+
+  let ast = 
+        case parse code of 
+          Ok program -> case typecheck program of 
+                          Right ok -> ok
+                          Left err -> error $ show err
+          Error err  -> error err
+
+  -- print ast
+  -- print $ compile $ rename ast
+  -- putStrLn ""
+  -- print $ zip [0..] $ compile $ rename ast
+  writeFile "output.txt" $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast

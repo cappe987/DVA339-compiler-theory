@@ -41,7 +41,8 @@ data Instruction
   -- Int comparison
   | EQINT 
   | LTINT 
-  | GTINT
+  | LEINT
+  -- | GTINT
   -- Bool operations
   | NOT
   | OR 
@@ -85,7 +86,8 @@ instance Show Instruction where
   show (POP i) = "POP " ++ show i
   show EQINT = "EQINT"
   show LTINT = "LTINT"
-  show GTINT = "GTINT"
+  -- show GTINT = "GTINT"
+  show LEINT = "LEINT"
   show NOT = "NOT"
   show OR = "OR"
   show AND = "AND"
@@ -144,9 +146,11 @@ compileExpr (CNEqual e1 e2 DTBool) =
 compileExpr (CLT e1 e2)        = 
   (LTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CGT e1 e2)        = 
-  (GTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
+  (NOT :) . (LEINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
+--   (GTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CLEQ e1 e2)       = 
-  (NOT :) . (GTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
+  (LEINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
+--   (NOT :) . (GTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CGEQ e1 e2)       = 
   (NOT :) . (LTINT :) <$> ((++) <$> compileExpr e2 <*> compileExpr e1)
 compileExpr (CNot e)           = (NOT :) <$> compileExpr e
@@ -247,7 +251,7 @@ compileStatement (CReturn e dt) = do
 compileFunction :: CFunction -> Generator [Instruction]
 compileFunction (CFunction dt name params body) = do
   let n = length params
-      newMap = foldl (\acc (i, (_,n)) -> Map.insert n i acc) Map.empty $ zip [1..] params
+      newMap = foldl (\acc (i, (_,n)) -> Map.insert n i acc) Map.empty $ zip [2..] params
       env = CompileEnv {offsets = newMap, returnoffset = n + 2, nextoffset = -1}
   put env
   body' <- compileStatement body
@@ -312,7 +316,7 @@ getFunctionAddress xs s = fst $ head $ filter (\(i,s') -> s == s') xs
 passTwo :: [Instruction] -> [Instruction]
 passTwo xs = 
   let (funcs, rest) = partition (\case (i, FUNCTION _) -> True; _ -> False) $ zip [0..] xs
-      funcNames = map (\(i, FUNCTION s) -> (i,s)) funcs
+      funcNames = zipWith (\n (i,s) -> (i-n, s)) [0..] $ map (\(i, FUNCTION s) -> (i,s)) funcs
   in map ((\case BSRLabel s ->  BSR $ getFunctionAddress funcNames s; x -> x) . snd) rest
 
 compile tree = 
