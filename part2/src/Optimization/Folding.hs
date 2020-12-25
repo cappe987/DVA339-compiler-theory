@@ -112,6 +112,7 @@ foldStatement (CIf e s) = do
   e' <- foldExpr e 
   body <- foldStatement s
   b <- isConstant e'
+  modify (Bf.second succ)
   if b then
     if (\(CBool b) -> b) e' then
       return body -- is constant true
@@ -120,7 +121,8 @@ foldStatement (CIf e s) = do
   else
     if null body then
       return [] -- body is empty after removing things
-    else
+    else do
+      modify (Bf.second pred) -- Undo the succ
       return [CIf e' (CStmntList (length body) body)]
 
 foldStatement (CIfElse e s1 s2) = do
@@ -128,6 +130,7 @@ foldStatement (CIfElse e s1 s2) = do
   b <- isConstant e'
   ifBody   <- foldStatement s1
   elseBody <- foldStatement s2
+  modify (Bf.second succ)
   if b then
     if (\(CBool b) -> b) e' then
       return ifBody -- is constant true
@@ -141,7 +144,8 @@ foldStatement (CIfElse e s1 s2) = do
         return [CIf e' (CStmntList (length ifBody) ifBody)]
     else if null ifBody then -- Replace else with not-if.
       return [CIf (CNot e') (CStmntList (length elseBody) elseBody)]
-    else -- Return if-else
+    else do -- Return if-else
+      modify (Bf.second pred) -- Remove the one added before. 
       return [CIfElse e' (CStmntList (length ifBody) ifBody) (CStmntList (length elseBody) elseBody)]
 
 foldStatement (CWhile e s) = do 
@@ -149,10 +153,12 @@ foldStatement (CWhile e s) = do
   b <- isConstant e'
   body <- foldStatement s
   if b then
-    if (\(CBool b) -> b) e' then
+    if (\(CBool b) -> b) e' then do
       -- infinite loop. Leave it in for now.
+      modify (Bf.second succ)
       return [CWhile e' (CStmntList (length body) body)]
-    else
+    else do
+      modify (Bf.second succ)
       return [] -- empty body
   else
     return [CWhile e' (CStmntList (length body) body)]
@@ -189,46 +195,21 @@ removeConst m acc var@(CVarDecl dt name) =
     Just _  -> acc
     Nothing -> var:acc
 
-removeConst m acc (CIf e (CStmntList i ss)) = 
+removeConst m acc (CIf e (CStmntList _ ss)) = 
   let acc' = reverse $ foldl (removeConst m) [] ss
-  in 
-    if null acc' then
-      acc
-    else
-      CIf e (CStmntList (length acc') acc') : acc
-
-removeConst m acc (CIfElse e (CStmntList i s1) (CStmntList i' s2)) = 
-  let acc'  = reverse $ foldl (removeConst m) [] s1
-      acc'' = reverse $ foldl (removeConst m) [] s2
-  in 
-    if null acc' then
-      if null acc'' then
-        acc
-      else
-        CIf (CNot e) (CStmntList (length acc'') acc'') : acc
-    else if null acc'' then
-      CIf e (CStmntList (length acc') acc') : acc
-    else 
-      CIfElse e (CStmntList (length acc') acc') (CStmntList (length acc'') acc'') : acc
-
-removeConst m acc (CWhile e (CStmntList i ss)) = 
+  in CIf e (CStmntList (length acc') acc') : acc
+removeConst m acc (CIfElse e (CStmntList _ ss) (CStmntList _ ss')) = 
+  let acc'  = reverse $ foldl (removeConst m) [] ss
+      acc'' = reverse $ foldl (removeConst m) [] ss'
+  in CIfElse e (CStmntList (length acc') acc') (CStmntList (length acc'') acc'') : acc
+removeConst m acc (CWhile e (CStmntList _ ss)) = 
   let acc' = reverse $ foldl (removeConst m) [] ss
-  in 
-    if null acc' then
-      acc
-    else
-      CWhile e (CStmntList (length acc') acc') : acc
-removeConst m acc (CStmntList i ss) = 
+  in CWhile e (CStmntList (length acc') acc') : acc
+removeConst m acc (CStmntList _ ss) = 
   let acc' = reverse $ foldl (removeConst m) [] ss
-  in 
-    if null acc' then 
-      acc
-    else
-      CStmntList (length acc') acc' : acc
+  in CStmntList (length acc') acc' : acc
 removeConst m acc x = x:acc
 
--- removeConstants (CFunction dt n p ss) = 
-  
 optimizeFunction :: CFunction -> CFunction
 optimizeFunction f = 
   if c == 0 then
@@ -236,7 +217,7 @@ optimizeFunction f =
   else 
     let acc = reverse (removeConst m [] ss)
     in  -- acc will only contain a CStmntList or be empty.
-      if null acc then 
+      if null acc then -- Function is empty. 
         CFunction dt n p (CStmntList 0 [])
       else
         optimizeFunction (CFunction dt n p (head acc))
@@ -245,10 +226,3 @@ optimizeFunction f =
 
 
 optimizeFold = map optimizeFunction
-
-
-
-{- 
-Perhaps remove the null checks in removeConstants? Since foldStatement 
-also does a check like that.
--}
