@@ -42,6 +42,7 @@ library
       AST
       Lex
       PrettyPrinter
+      PrettyPrinter2
       Lib
   other-modules:
       -- Paths_part2
