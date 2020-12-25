@@ -5,20 +5,18 @@ module Optimization.Folding
 
 import qualified Data.Map as Map
 import Control.Monad.State
--- import qualified Data.Set as S
 import Data.Bifunctor as Bf
+import Debug.Trace
 
 import Datatypes
 import Typechecker
 
--- type  = Map.Map String Bool
 type FoldState a = State (Map.Map String CExpr, Int) a
 type BinaryOp = (CExpr -> CExpr -> CExpr)
 
 isConstant :: CExpr -> FoldState Bool
 isConstant (CBool _) = return True
 isConstant (CInt  _) = return True
--- isConstant (CVar _ name) = get >>= (\(set,_) -> return (name `elem` set)) 
 isConstant _ = return False
 
 integerOp :: (Int -> Int -> Int) -> CExpr -> CExpr -> CExpr
@@ -54,7 +52,8 @@ foldUnary :: (CExpr -> CExpr) -> (CExpr -> CExpr) -> CExpr -> FoldState CExpr
 foldUnary f f' e = do 
   c <- foldExpr e
   b <- isConstant c
-  if b then
+  if b then do
+    modify (Bf.second (+1))
     return $ f c
   else
     return $ f' c
@@ -89,37 +88,167 @@ foldExpr (CAsn dt name e) = do
   b <- isConstant e'
   if b then do
     modify (Bf.first $ Map.insert name e')
-    return $ CAsn dt name e'
+    modify (Bf.second (+1))
+    return e'
   else do
     modify (Bf.first $ Map.delete name)
     return $ CAsn dt name e'
 foldExpr (CVar dt name) = do 
   (m, _) <- get
   case Map.lookup name m of
-    Nothing  -> return $ CVar dt name
-    Just val -> return val
+    Nothing  -> 
+      return $ CVar dt name
+    Just val -> do
+      modify (Bf.second (+1))
+      return val
 
-foldExpr x = return x -- Matches Bool, Int
+foldExpr x@(CInt  _) = return x 
+foldExpr x@(CBool _) = return x
 
-foldStatement :: CStatement -> FoldState CStatement
-foldStatement (CReturn e dt) = (`CReturn` dt) <$> foldExpr e
-foldStatement (CExpr e dt) = (`CExpr` dt) <$> foldExpr e
-foldStatement (CIf e s) = CIf <$> foldExpr e <*> foldStatement s
-foldStatement (CIfElse e s1 s2) = 
-  CIfElse <$> foldExpr e <*> foldStatement s1 <*> foldStatement s2
-foldStatement (CWhile e s) = CWhile <$> foldExpr e <*> foldStatement s
-foldStatement (CStmntList i ss) = CStmntList i <$> mapM foldStatement ss
+foldStatement :: CStatement -> FoldState [CStatement]
+foldStatement (CReturn e dt) = return . (`CReturn` dt) <$> foldExpr e
+foldStatement (CExpr e dt) = return . (`CExpr` dt) <$> foldExpr e
+foldStatement (CIf e s) = do 
+  e' <- foldExpr e 
+  body <- foldStatement s
+  b <- isConstant e'
+  if b then
+    if (\(CBool b) -> b) e' then
+      return body -- is constant true
+    else 
+      return [] -- is constant false, remove statement
+  else
+    if null body then
+      return [] -- body is empty after removing things
+    else
+      return [CIf e' (CStmntList (length body) body)]
 
-foldStatement stmnt = 
-  return stmnt 
-  -- Matches VarDecl and ReturnVoid
-  -- VarDecl does not do anything in terms of folding. 
-  -- If it's constant or not depends on when it's first assigned.
+foldStatement (CIfElse e s1 s2) = do
+  e' <- foldExpr e
+  b <- isConstant e'
+  ifBody   <- foldStatement s1
+  elseBody <- foldStatement s2
+  if b then
+    if (\(CBool b) -> b) e' then
+      return ifBody -- is constant true
+    else
+      return elseBody -- is constant false
+  else
+    if null elseBody then
+      if null ifBody then -- Remove statement completely
+        return [] 
+      else -- Remove else
+        return [CIf e' (CStmntList (length ifBody) ifBody)]
+    else if null ifBody then -- Replace else with not-if.
+      return [CIf (CNot e') (CStmntList (length elseBody) elseBody)]
+    else -- Return if-else
+      return [CIfElse e' (CStmntList (length ifBody) ifBody) (CStmntList (length elseBody) elseBody)]
+
+foldStatement (CWhile e s) = do 
+  e' <- foldExpr e
+  b <- isConstant e'
+  body <- foldStatement s
+  if b then
+    if (\(CBool b) -> b) e' then
+      -- infinite loop. Leave it in for now.
+      return [CWhile e' (CStmntList (length body) body)]
+    else
+      return [] -- empty body
+  else
+    return [CWhile e' (CStmntList (length body) body)]
+
+foldStatement (CStmntList i ss) = 
+  concat <$> mapM foldStatement ss
+  -- concat because if a block statement was removed then its
+  -- body was returned, which can contain several statements
+
+foldStatement (CVarDecl dt name) = do 
+  -- Little hack. Uninitialized variables are saved as constant 0 until
+  -- given a value. The typechecker should make sure that no uninitialized 
+  -- variables are used so it shouldn't matter.
+  modify (Bf.first (Map.insert name (CInt 0)))
+  return [CVarDecl dt name]
+
+foldStatement CReturnVoid = return [CReturnVoid]
+
+
 
 
 foldFunction :: CFunction -> FoldState CFunction
-foldFunction (CFunction dt n p ss) = CFunction dt n p <$> foldStatement ss
+foldFunction (CFunction dt n p ss) = do
+  body <- foldStatement ss
+  return $ CFunction dt n p (CStmntList (length body) body)
 
 
-optimizeFold :: [CFunction] -> FoldState [CFunction]
-optimizeFold = mapM foldFunction
+
+removeConst :: Map.Map String CExpr -> [CStatement] -> CStatement -> [CStatement]
+removeConst m acc (CExpr (CInt  _) dt) = acc
+removeConst m acc (CExpr (CBool _) dt) = acc
+removeConst m acc var@(CVarDecl dt name) = 
+  case Map.lookup name m of
+    Just _  -> acc
+    Nothing -> var:acc
+
+removeConst m acc (CIf e (CStmntList i ss)) = 
+  let acc' = reverse $ foldl (removeConst m) [] ss
+  in 
+    if null acc' then
+      acc
+    else
+      CIf e (CStmntList (length acc') acc') : acc
+
+removeConst m acc (CIfElse e (CStmntList i s1) (CStmntList i' s2)) = 
+  let acc'  = reverse $ foldl (removeConst m) [] s1
+      acc'' = reverse $ foldl (removeConst m) [] s2
+  in 
+    if null acc' then
+      if null acc'' then
+        acc
+      else
+        CIf (CNot e) (CStmntList (length acc'') acc'') : acc
+    else if null acc'' then
+      CIf e (CStmntList (length acc') acc') : acc
+    else 
+      CIfElse e (CStmntList (length acc') acc') (CStmntList (length acc'') acc'') : acc
+
+removeConst m acc (CWhile e (CStmntList i ss)) = 
+  let acc' = reverse $ foldl (removeConst m) [] ss
+  in 
+    if null acc' then
+      acc
+    else
+      CWhile e (CStmntList (length acc') acc') : acc
+removeConst m acc (CStmntList i ss) = 
+  let acc' = reverse $ foldl (removeConst m) [] ss
+  in 
+    if null acc' then 
+      acc
+    else
+      CStmntList (length acc') acc' : acc
+removeConst m acc x = x:acc
+
+-- removeConstants (CFunction dt n p ss) = 
+  
+optimizeFunction :: CFunction -> CFunction
+optimizeFunction f = 
+  if c == 0 then
+    f' 
+  else 
+    let acc = reverse (removeConst m [] ss)
+    in  -- acc will only contain a CStmntList or be empty.
+      if null acc then 
+        CFunction dt n p (CStmntList 0 [])
+      else
+        optimizeFunction (CFunction dt n p (head acc))
+
+  where (f'@(CFunction dt n p ss), (m,c)) = runState (foldFunction f) (Map.empty, 0)
+
+
+optimizeFold = map optimizeFunction
+
+
+
+{- 
+Perhaps remove the null checks in removeConstants? Since foldStatement 
+also does a check like that.
+-}

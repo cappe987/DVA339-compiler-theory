@@ -5,11 +5,13 @@ module Lib
 import Lex
 import AST
 import HappyParser
-import PrettyPrinter
+import PrettyPrinter as P1
+import PrettyPrinter2 as P2
 import Interpreter.Interpreter
 import Typechecker
 import Renamer
 import Codegenerator
+import Optimization.Optimization
 
 someFunc :: IO ()
 someFunc = test25
@@ -33,7 +35,7 @@ test22 = do
     Ok    program -> do
       -- putStrLn "true"
       -- writeFile "prettyprint.c" (prettyPrint program)
-      let cleanProgram = removeWhitespace (prettyPrint program)
+      let cleanProgram = removeWhitespace (P1.prettyPrint program)
           cleanOriginal = removeWhitespace orig
 
       if cleanOriginal == cleanProgram then 
@@ -159,3 +161,22 @@ lab25_run s = do
   -- putStrLn ""
   -- print $ zip [0..] $ compile $ rename ast
   writeFile "output.txt" $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast
+
+
+
+test26_file = do 
+  code <- readFile "src/test.c" 
+
+  let ast = 
+        case parse code of 
+          Ok program -> case typecheck program of 
+                          Right ok -> ok
+                          Left err -> error $ show err
+          Error err  -> error err
+
+  putStr $ P2.prettyPrint ast
+  let val = optimize ast
+  putStrLn "---------------------------"
+  putStrLn $ P2.prettyPrint val
+  -- putStrLn $ "Folds: " ++ show (snd st)
+  -- putStrLn $ "Constants: " ++ show (fst st)
