@@ -164,6 +164,7 @@ lab25_run s = do
 
 
 
+test26_file :: IO ()
 test26_file = do 
   code <- readFile "src/test.c" 
 
