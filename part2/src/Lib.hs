@@ -14,7 +14,7 @@ import Codegenerator
 import Optimization.Optimization
 
 someFunc :: IO ()
-someFunc = test25
+someFunc = test23
 
 parse :: String -> E Program
 parse = happyParser . alexScanTokens

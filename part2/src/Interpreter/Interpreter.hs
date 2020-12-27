@@ -2,6 +2,7 @@ module Interpreter.Interpreter where
 
 import Control.Monad.Except
 import Control.Monad.RWS
+import Control.Monad.Cont
 import qualified Data.Map as Map
 import Data.List
 
@@ -11,6 +12,8 @@ import Interpreter.InterpreterBase
 import Interpreter.InterpreterErrors
 import Datatypes
 
+type Contig r v = ContT r ExprInterpreter v
+type Exiter r = Value -> Contig r Value
 
 evalExpr :: Expr -> ExprInterpreter Value
 evalExpr (Int       _ i) = return (VInt i)
@@ -149,16 +152,20 @@ callFunction (Id p name) es = do
   put [Map.empty, paramMap] -- Assigns new empty state for function call
 
   -- Calls function
-  res <- addStackTrace name p $ runExceptT (evalFunction name (typeToDataType t) stmnts)
+  -- res <- addStackTrace name p $ runExceptT (evalFunction name (typeToDataType t) stmnts)
+  -- res <- runContT (evalFunction name (typeToDataType t) stmnts) return
+  res <- runContT (callCC $ \exit -> evalFunction name (typeToDataType t) stmnts exit) return
+  -- let res = undefined :: Either (ExprInterpreter Value) Any
   
   put prevState -- Puts back the previous state
+  return res
 
   -- addStackTrace maps the error message. So if it fails it will show at which
   -- function call the error happened and creates a complete stack trace.
-  case res of
-    Right _ -> 
-      addStackTrace name p $ return VVoid
-    Left val -> addStackTrace name p val
+  -- case res of
+    -- Right _ -> 
+      -- addStackTrace name p $ return VVoid
+    -- Left val -> addStackTrace name p val
 
 
 
@@ -167,18 +174,18 @@ callFunction (Id p name) es = do
 -- ------------- Evaluation of functions and statements --------------
 
 -- Make this throw error for when return value does not match function type.
-evalFunction :: String -> DataType -> [Stmnt] -> FunInterpreter ()
-evalFunction name expectedReturnType stmnts = do
+evalFunction :: String -> DataType -> [Stmnt] -> Exiter r -> Contig r Value
+evalFunction name expectedReturnType stmnts exit = callCC $ \k -> do
   -- Eval all statements in body
-  foldM_ (\_ a -> evalStmnt expectedReturnType a) () stmnts
-
-  -- If no return statement was executed, check if function is void
-  if VVoid `isType` expectedReturnType then
-    returnValue (return VVoid)
+  -- res <- foldM (\_ a -> evalStmnt expectedReturnType a exit) VVoid stmnts
+  res <- evalStmnt expectedReturnType (StmntList stmnts) exit
+  if res `isType` expectedReturnType then
+    exit res
   else
-    missingReturnError name
+    lift $ throwError "Missing return error"
+  --   -- missingReturnError name
   
-evalIfElse :: AlexPosn -> Expr -> FunInterpreter () -> FunInterpreter () -> FunInterpreter ()
+evalIfElse :: AlexPosn -> Expr -> Contig r Value -> Contig r Value -> Contig r Value
 evalIfElse p e s1 s2 = do
   v <- lift $ evalExpr e
   if v `isType` DTBool && toBool v then 
@@ -186,58 +193,63 @@ evalIfElse p e s1 s2 = do
   else if v `isType` DTBool then
     s2 -- If false, may be empty if it's just an if-statement
   else 
-    conditionTypeError p (valueToType v) "if"
+    -- conditionTypeError p (valueToType v) "if"
+    lift $ throwError "Typeerror in if-else condition"
 
--- Loops until false
--- The first iteration is done in `evalStmnt` and 
--- checks that the condition is type correct. No need to check types twice.
-repeatWhile :: DataType -> Expr -> Stmnt -> FunInterpreter () 
-repeatWhile dt e s = do 
+-- -- Loops until false
+-- -- The first iteration is done in `evalStmnt` and 
+-- -- checks that the condition is type correct. No need to check types twice.
+repeatWhile :: DataType -> Expr -> Stmnt -> Exiter r -> Contig r ()
+repeatWhile dt e s exit = do 
   v <- lift $ evalExpr e
   when (toBool v) $ do 
-                    evalStmnt dt s
-                    repeatWhile dt e s
+                    evalStmnt dt s exit
+                    repeatWhile dt e s exit
 
 -- The DataType is the expected return type, so it can throw good error message 
 -- when return types don't match.
-evalStmnt :: DataType -> Stmnt -> FunInterpreter ()
-evalStmnt dt (Expr e) = do 
-  lift $ evalExpr e
-  return ()
-evalStmnt dt (VariableDecl (Variable t (Id p name))) = do 
+evalStmnt :: DataType -> Stmnt -> Exiter r -> Contig r Value
+evalStmnt dt (Expr e) _ = lift (evalExpr e)
+evalStmnt dt (VariableDecl (Variable t (Id p name))) _ = do 
   st <- get
   if varExistsInTopEnv name st then
-    varAlreadyDeclaredError p name
-  else
+    -- varAlreadyDeclaredError p name
+    lift $ throwError "Var already declared"
+  else do
     modify (varDeclare name (typeToDataType t)) 
+    return VVoid
   -- If the variable is already declared on the same level it is just overwritten.
   -- Didn't find anything for how to handle it. 
-evalStmnt dt (If p e stmnt) = evalIfElse p e (evalStmnt dt stmnt) (return ())
-evalStmnt dt (IfElse p1 _ e s1 s2) = evalIfElse p1 e (evalStmnt dt s1) (evalStmnt dt s2)
-evalStmnt DTVoid (ReturnVoid _) = returnValue (return VVoid)
-evalStmnt dt     (ReturnVoid p) = returnTypeError p DTVoid dt
+evalStmnt dt (If p e stmnt) exit = evalIfElse p e (evalStmnt dt stmnt exit) (return VVoid)
+evalStmnt dt (IfElse p1 _ e s1 s2) exit = evalIfElse p1 e (evalStmnt dt s1 exit) (evalStmnt dt s2 exit)
+evalStmnt DTVoid (ReturnVoid _) exit = exit VVoid -- returnValue (return VVoid)
+evalStmnt dt     (ReturnVoid p) _    = lift $ throwError "Typeerror returnvoid" -- returnTypeError p DTVoid dt
 
-evalStmnt dt (Return   p e) = do 
+evalStmnt dt (Return   p e) exit = do 
   v <- lift $ evalExpr e
   if v `isType` dt then
-    returnValue (return v)
-  else
-    returnTypeError p dt (valueToType v)
+    -- returnValue (return v)
+    exit v 
+  else 
+    lift $ throwError "Typeerror at return value"
 
-evalStmnt dt (While p e s) = do 
+evalStmnt dt (While p e s) exit = do 
   v <- lift $ evalExpr e
   if v `isType` DTBool && toBool v then do
-    evalStmnt dt s
-    repeatWhile dt e s
+    evalStmnt dt s exit
+    repeatWhile dt e s exit
+    return VVoid
   else if v `isType` DTBool then
-    return () 
+    return VVoid
   else
-    conditionTypeError p dt "while"
+    -- conditionTypeError p dt "while"
+    lift $ throwError "Typeerror in loop condition"
     
-evalStmnt dt (StmntList ss) = do 
+evalStmnt dt (StmntList ss) exit = do 
   modify (Map.empty :) -- Append an empty environment for the new scope
-  foldM_ (\_ a -> evalStmnt dt a) () ss -- Evaluate statements
+  foldM_ (\_ a -> void $ evalStmnt dt a exit) () ss -- Evaluate statements
   modify tail -- Pop the environment
+  return VVoid
 
 
 
