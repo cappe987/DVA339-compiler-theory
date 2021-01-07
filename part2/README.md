@@ -9,15 +9,6 @@ Lab 2.4: Write a typechecker for the language
 Lab 2.5: Write a compiler for the Trac42VM  
 Lab 2.6: Write an optimizer for the language  
 
-
-## Desugaring? (Lecture 6)
-Do a pre-pass to evaluator to rename variables to remove shadowing.
-Keep track of display name for error messages.
-I realize I've already used similar method in my interpreter, but without actually renaming anything.
-
-Replace the types properly when desugaring? Not sure if this would give any advantage.
-
-
 # Grammar of the language
 ```
 Program ::= Decl*

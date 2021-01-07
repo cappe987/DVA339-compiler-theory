@@ -11,10 +11,10 @@ import Interpreter.Interpreter
 import Typechecker
 import Renamer
 import Codegenerator
-import Optimization.Optimization
+import Optimization
 
 someFunc :: IO ()
-someFunc = test25
+someFunc = test26_file
 
 parse :: String -> E Program
 parse = happyParser . alexScanTokens
@@ -137,10 +137,6 @@ test25_file = do
                           Left err -> error $ show err
           Error err  -> error err
 
-  -- print ast
-  -- print $ compile $ rename ast
-  -- putStrLn ""
-  -- print $ zip [0..] $ compile $ rename ast
   writeFile "output.txt" $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast
 
 
@@ -156,10 +152,6 @@ lab25_run s = do
                           Left err -> error $ show err
           Error err  -> error err
 
-  -- print ast
-  -- print $ compile $ rename ast
-  -- putStrLn ""
-  -- print $ zip [0..] $ compile $ rename ast
   writeFile "output.txt" $ unlines $ zipWith (\i s -> show i ++ " " ++ s) [0..] $ map show $ compile $ rename ast
 
 
@@ -179,5 +171,3 @@ test26_file = do
   let val = optimize ast
   putStrLn "---------------------------"
   putStrLn $ P2.prettyPrint val
-  -- putStrLn $ "Folds: " ++ show (snd st)
-  -- putStrLn $ "Constants: " ++ show (fst st)

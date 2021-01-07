@@ -31,8 +31,7 @@ library
       Interpreter.InterpreterBase
       Interpreter.InterpreterErrors
       
-      Optimization.Folding
-      Optimization.Optimization
+      Optimization
 
       Datatypes
       Typechecker

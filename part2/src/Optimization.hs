@@ -1,6 +1,6 @@
-module Optimization.Folding 
+module Optimization
   (
-    optimizeFold
+    optimize
   ) where
 
 import qualified Data.Map as Map
@@ -225,4 +225,4 @@ optimizeFunction f =
   where (f'@(CFunction dt n p ss), (m,c)) = runState (foldFunction f) (Map.empty, 0)
 
 
-optimizeFold = map optimizeFunction
+optimize = map optimizeFunction
